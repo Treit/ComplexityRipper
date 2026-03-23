@@ -231,10 +231,10 @@ a:hover { text-decoration: underline; }
 .theme-switcher select { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 12px; cursor: pointer; }
 
 /* Summary table */
-.summary-table { border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
-.summary-table td { padding: 4px 16px 4px 0; white-space: nowrap; border: none; }
-.summary-table td:first-child { color: var(--text-muted); }
-.summary-table td:last-child { font-weight: 600; }
+.summary-table { border-collapse: collapse; margin-bottom: 24px; font-size: 14px; width: auto; }
+.summary-table td { padding: 4px 8px 4px 0; white-space: nowrap; border: none; }
+.summary-table td:first-child { color: var(--text-muted); padding-right: 12px; }
+.summary-table td:last-child { font-weight: 600; text-align: left; }
 
 /* Tables */
 .table-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; margin-bottom: 24px; }
