@@ -15,42 +15,104 @@ public class HtmlReportGenerator
     {
         var sb = new StringBuilder();
 
-        // Build repo info lookup
         var repoLookup = data.Repos.ToDictionary(r => r.Name, r => r, StringComparer.OrdinalIgnoreCase);
 
-        // Classify functions
-        var longFunctions = data.Functions
-            .Where(f => f.LineCount >= thresholdLines)
-            .OrderByDescending(f => f.LineCount)
+        var repoStats = data.Functions
+            .GroupBy(f => f.Repo)
+            .Select(g => BuildRepoStats(g.Key, g.ToList(), repoLookup, thresholdLines, thresholdComplexity))
+            .OrderByDescending(r => r.ConcernScore)
             .ToList();
 
-        var complexFunctions = data.Functions
-            .Where(f => f.CyclomaticComplexity >= thresholdComplexity)
-            .OrderByDescending(f => f.CyclomaticComplexity)
-            .ToList();
-
-        var combinedRisk = data.Functions
-            .Where(f => f.LineCount >= thresholdLines && f.CyclomaticComplexity >= thresholdComplexity)
-            .OrderByDescending(f => f.CyclomaticComplexity * f.LineCount)
-            .ToList();
+        int totalLong = repoStats.Sum(r => r.LongCount);
+        int totalComplex = repoStats.Sum(r => r.ComplexCount);
+        int totalCombined = repoStats.Sum(r => r.CombinedCount);
 
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html lang=\"en\">");
         AppendHead(sb, theme);
         sb.AppendLine("<body>");
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
-        AppendSummaryCards(sb, data, longFunctions.Count, complexFunctions.Count, combinedRisk.Count);
-        AppendRepoBreakdown(sb, data, thresholdLines, thresholdComplexity);
+        AppendSummaryCards(sb, data, totalLong, totalComplex, totalCombined);
+        AppendRepoRanking(sb, repoStats);
         AppendLanguageBreakdown(sb, data);
         AppendDistributionCharts(sb, data, thresholdLines, thresholdComplexity);
-        AppendCombinedRiskTable(sb, combinedRisk, repoLookup);
-        AppendFunctionTable(sb, "Long Functions", $"Functions with {thresholdLines}+ lines", longFunctions, repoLookup, "long-functions");
-        AppendFunctionTable(sb, "High Complexity Functions", $"Functions with cyclomatic complexity ≥ {thresholdComplexity}", complexFunctions, repoLookup, "complex-functions");
+        AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
 
         File.WriteAllText(outputPath, sb.ToString());
+    }
+
+    private record RepoStatsRow(
+        string Name,
+        string? BaseUrl,
+        string DefaultBranch,
+        int FileCount,
+        int FunctionCount,
+        int LongCount,
+        int ComplexCount,
+        int CombinedCount,
+        double AvgComplexity,
+        int MaxComplexity,
+        int MaxLines,
+        int ConcernScore,
+        List<FunctionMetrics> Long,
+        List<FunctionMetrics> Complex,
+        List<FunctionMetrics> Combined);
+
+    private static RepoStatsRow BuildRepoStats(
+        string repoName,
+        List<FunctionMetrics> functions,
+        Dictionary<string, RepoInfo> repoLookup,
+        int thresholdLines,
+        int thresholdComplexity)
+    {
+        repoLookup.TryGetValue(repoName, out var info);
+
+        var longFuncs = functions.Where(f => f.LineCount >= thresholdLines).OrderByDescending(f => f.LineCount).ToList();
+        var complexFuncs = functions.Where(f => f.CyclomaticComplexity >= thresholdComplexity).OrderByDescending(f => f.CyclomaticComplexity).ToList();
+        var combinedFuncs = functions.Where(f => f.LineCount >= thresholdLines && f.CyclomaticComplexity >= thresholdComplexity)
+            .OrderByDescending(f => f.CyclomaticComplexity * f.LineCount).ToList();
+
+        // Concern score: weighted sum of flagged functions
+        // Combined risk (both thresholds) = 10 points each
+        // Complex only = 3 points each
+        // Long only = 2 points each
+        // Extra points for extreme values
+        int score = combinedFuncs.Count * 10
+            + (complexFuncs.Count - combinedFuncs.Count) * 3
+            + (longFuncs.Count - combinedFuncs.Count) * 2;
+
+        foreach (var f in functions)
+        {
+            if (f.CyclomaticComplexity >= thresholdComplexity * 2)
+            {
+                score += 5;
+            }
+
+            if (f.LineCount >= thresholdLines * 2)
+            {
+                score += 3;
+            }
+        }
+
+        return new RepoStatsRow(
+            Name: repoName,
+            BaseUrl: info?.AdoBaseUrl,
+            DefaultBranch: info?.DefaultBranch ?? "main",
+            FileCount: info?.FileCount ?? 0,
+            FunctionCount: functions.Count,
+            LongCount: longFuncs.Count,
+            ComplexCount: complexFuncs.Count,
+            CombinedCount: combinedFuncs.Count,
+            AvgComplexity: functions.Count > 0 ? functions.Average(f => f.CyclomaticComplexity) : 0,
+            MaxComplexity: functions.Count > 0 ? functions.Max(f => f.CyclomaticComplexity) : 0,
+            MaxLines: functions.Count > 0 ? functions.Max(f => f.LineCount) : 0,
+            ConcernScore: score,
+            Long: longFuncs,
+            Complex: complexFuncs,
+            Combined: combinedFuncs);
     }
 
     private void AppendHead(StringBuilder sb, string defaultTheme)
@@ -202,6 +264,10 @@ tr:hover { background: var(--bg-tertiary); }
 .count-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); margin-left: 8px; }
 .repo-separator td { background: var(--bg-tertiary); border-top: 2px solid var(--border); }
 .repo-heading { font-weight: 700; font-size: 14px; padding: 10px 12px; }
+.repo-detail-section { margin: 24px 0; padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
+.repo-detail-section h3 { margin: 0 0 4px 0; font-size: 20px; }
+.repo-detail-section .subtitle { margin-bottom: 16px; }
+.repo-detail-section .table-container { border: 1px solid var(--border); margin-bottom: 16px; }
 
 /* Charts */
 .chart-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
@@ -355,44 +421,130 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</div>");
     }
 
-    private void AppendCombinedRiskTable(StringBuilder sb, List<FunctionMetrics> functions, Dictionary<string, RepoInfo> repoLookup)
+    private void AppendRepoRanking(StringBuilder sb, List<RepoStatsRow> repoStats)
     {
-        sb.AppendLine($"<h2>⚠️ Combined Risk — Long AND Complex <span class=\"count-badge\">{functions.Count}</span></h2>");
-        if (functions.Count == 0)
-        {
-            sb.AppendLine("<p style=\"color: var(--severity-ok);\">No functions exceed both thresholds.</p>");
-            return;
-        }
-        AppendFunctionTable(sb, null, "Functions exceeding BOTH line count and complexity thresholds — highest refactoring priority", functions, repoLookup, "combined-risk");
-    }
-
-    private void AppendFunctionTable(StringBuilder sb, string? title, string description, List<FunctionMetrics> functions, Dictionary<string, RepoInfo> repoLookup, string tableId)
-    {
-        if (title != null)
-        {
-            sb.AppendLine($"<h2>{Encode(title)} <span class=\"count-badge\">{functions.Count}</span></h2>");
-        }
-
+        sb.AppendLine("<h2>Repository Ranking</h2>");
         sb.AppendLine("<div class=\"table-container\">");
         sb.AppendLine("<div class=\"table-header\">");
-        sb.AppendLine($"  <span style=\"color: var(--text-muted); font-size: 13px;\">{Encode(description)}</span>");
-        sb.AppendLine("  <div style=\"display: flex; gap: 8px;\">");
+        sb.AppendLine("  <span style=\"color: var(--text-muted); font-size: 13px;\">Ranked by concern score (worst first)</span>");
+        sb.AppendLine($"  <input type=\"text\" class=\"table-filter\" placeholder=\"Filter...\" oninput=\"filterTable('repo-ranking', this.value)\">");
+        sb.AppendLine("</div>");
 
-        // Repo dropdown filter
-        var repos = functions.Select(f => f.Repo).Where(r => !string.IsNullOrEmpty(r)).Distinct().OrderBy(r => r).ToList();
-        if (repos.Count > 1)
+        sb.AppendLine("<table id=\"repo-ranking\">");
+        sb.AppendLine("<thead><tr>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 0, 'number')\" class=\"numeric\"># <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 1, 'string')\">Repository <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 2, 'number')\" class=\"numeric\">Concern Score <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 3, 'number')\" class=\"numeric\">Files <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 4, 'number')\" class=\"numeric\">Functions <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 5, 'number')\" class=\"numeric\">Combined <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 6, 'number')\" class=\"numeric\">Long <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 7, 'number')\" class=\"numeric\">Complex <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 8, 'number')\" class=\"numeric\">Max CC <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 9, 'number')\" class=\"numeric\">Max Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("</tr></thead>");
+        sb.AppendLine("<tbody>");
+
+        int rank = 1;
+        foreach (var r in repoStats)
         {
-            sb.AppendLine($"    <select class=\"table-filter\" onchange=\"filterByRepoGroup('{tableId}', this.value)\">");
-            sb.AppendLine("      <option value=\"\">All repos</option>");
-            foreach (var repo in repos)
+            string repoCell = Encode(r.Name);
+            if (r.BaseUrl != null)
             {
-                sb.AppendLine($"      <option value=\"{Encode(repo)}\">{Encode(repo)}</option>");
+                repoCell = $"<a href=\"{Encode(r.BaseUrl)}\" target=\"_blank\">{Encode(r.Name)}</a>";
             }
-            sb.AppendLine("    </select>");
+
+            var scoreSeverity = r.ConcernScore >= 50 ? "severity-critical" : r.ConcernScore >= 20 ? "severity-high" : r.ConcernScore >= 5 ? "severity-medium" : "severity-ok";
+            var combinedSeverity = r.CombinedCount > 5 ? "severity-critical" : r.CombinedCount > 0 ? "severity-high" : "";
+
+            // Link repo name to its detail section
+            var anchorLink = r.ConcernScore > 0
+                ? $"<a href=\"#repo-{Encode(r.Name.Replace(" ", "-"))}\">{repoCell}</a>"
+                : repoCell;
+
+            sb.AppendLine("<tr>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{rank}\">{rank}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{anchorLink}</td>");
+            sb.AppendLine($"  <td class=\"numeric {scoreSeverity}\" data-v=\"{r.ConcernScore}\">{r.ConcernScore}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.FileCount}\">{r.FileCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.FunctionCount}\">{r.FunctionCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric {combinedSeverity}\" data-v=\"{r.CombinedCount}\">{r.CombinedCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.LongCount}\">{r.LongCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.ComplexCount}\">{r.ComplexCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.MaxComplexity}\">{r.MaxComplexity}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.MaxLines}\">{r.MaxLines}</td>");
+            sb.AppendLine("</tr>");
+            rank++;
         }
 
-        sb.AppendLine($"    <input type=\"text\" class=\"table-filter\" placeholder=\"Filter...\" oninput=\"filterTable('{tableId}', this.value)\">");
-        sb.AppendLine("  </div>");
+        sb.AppendLine("</tbody>");
+        sb.AppendLine("</table>");
+        sb.AppendLine("</div>");
+    }
+
+    private void AppendPerRepoDetails(StringBuilder sb, List<RepoStatsRow> repoStats, Dictionary<string, RepoInfo> repoLookup, int thresholdLines, int thresholdComplexity)
+    {
+        sb.AppendLine("<h2>Per-Repository Details</h2>");
+
+        var reposWithIssues = repoStats.Where(r => r.ConcernScore > 0).ToList();
+        var cleanRepos = repoStats.Where(r => r.ConcernScore == 0).ToList();
+
+        if (reposWithIssues.Count == 0)
+        {
+            sb.AppendLine("<p style=\"color: var(--severity-ok);\">No repositories have flagged functions.</p>");
+            return;
+        }
+
+        foreach (var repo in reposWithIssues)
+        {
+            var anchor = repo.Name.Replace(" ", "-");
+            var scoreSeverity = repo.ConcernScore >= 50 ? "severity-critical" : repo.ConcernScore >= 20 ? "severity-high" : repo.ConcernScore >= 5 ? "severity-medium" : "severity-ok";
+
+            string repoLabel = Encode(repo.Name);
+            if (repo.BaseUrl != null)
+            {
+                repoLabel = $"<a href=\"{Encode(repo.BaseUrl)}\" target=\"_blank\">{Encode(repo.Name)}</a>";
+            }
+
+            sb.AppendLine($"<div class=\"repo-detail-section\" id=\"repo-{Encode(anchor)}\">");
+            sb.AppendLine($"<h3>{repoLabel} <span class=\"count-badge {scoreSeverity}\">score: {repo.ConcernScore}</span></h3>");
+            sb.AppendLine($"<p class=\"subtitle\">{repo.FunctionCount:N0} functions across {repo.FileCount:N0} files &nbsp;|&nbsp; " +
+                          $"Combined: {repo.CombinedCount} &nbsp;|&nbsp; Long: {repo.LongCount} &nbsp;|&nbsp; Complex: {repo.ComplexCount}</p>");
+
+            var tablePrefix = $"repo-{anchor}";
+
+            if (repo.Combined.Count > 0)
+            {
+                AppendRepoFunctionTable(sb, "Combined Risk", repo.Combined, repo, $"{tablePrefix}-combined");
+            }
+
+            if (repo.Long.Count > 0)
+            {
+                AppendRepoFunctionTable(sb, $"Long Functions ({thresholdLines}+ lines)", repo.Long, repo, $"{tablePrefix}-long");
+            }
+
+            if (repo.Complex.Count > 0)
+            {
+                AppendRepoFunctionTable(sb, $"High Complexity (CC >= {thresholdComplexity})", repo.Complex, repo, $"{tablePrefix}-complex");
+            }
+
+            sb.AppendLine("</div>");
+        }
+
+        if (cleanRepos.Count > 0)
+        {
+            sb.AppendLine($"<p style=\"color: var(--text-muted); margin-top: 16px;\">{cleanRepos.Count} repositories have no flagged functions: ");
+            sb.AppendLine(string.Join(", ", cleanRepos.Select(r => Encode(r.Name))));
+            sb.AppendLine("</p>");
+        }
+    }
+
+    private void AppendRepoFunctionTable(StringBuilder sb, string title, List<FunctionMetrics> functions, RepoStatsRow repo, string tableId)
+    {
+        sb.AppendLine($"<div class=\"table-container\">");
+        sb.AppendLine("<div class=\"table-header\">");
+        sb.AppendLine($"  <span style=\"font-weight: 600; font-size: 13px;\">{Encode(title)} <span class=\"count-badge\">{functions.Count}</span></span>");
+        sb.AppendLine($"  <input type=\"text\" class=\"table-filter\" placeholder=\"Filter...\" oninput=\"filterTable('{tableId}', this.value)\">");
         sb.AppendLine("</div>");
 
         sb.AppendLine($"<table id=\"{tableId}\">");
@@ -405,127 +557,45 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 5, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 6, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 7, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 8, 'string')\">Language <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("</tr></thead>");
         sb.AppendLine("<tbody>");
 
-        var grouped = functions.GroupBy(f => f.Repo).OrderBy(g => g.Key);
-        foreach (var repoGroup in grouped)
+        foreach (var f in functions)
         {
-            repoLookup.TryGetValue(repoGroup.Key, out var repoInfo);
-            var baseUrl = repoInfo?.AdoBaseUrl;
-            var branch = repoInfo?.DefaultBranch ?? "main";
-
-            string repoLabel = Encode(repoGroup.Key);
-            if (baseUrl != null)
+            string fileCell = Encode(f.File);
+            if (repo.BaseUrl != null)
             {
-                repoLabel = $"<a href=\"{Encode(baseUrl)}\" target=\"_blank\">{Encode(repoGroup.Key)}</a>";
+                var fileUrl = AdoUrlHelper.BuildFileUrl(repo.BaseUrl, f.File, f.StartLine, f.EndLine, repo.DefaultBranch);
+                fileCell = $"<a href=\"{Encode(fileUrl)}\" target=\"_blank\" title=\"{Encode(f.File)}\">{Encode(GetShortFileName(f.File))}</a>";
             }
-            sb.AppendLine($"<tr class=\"repo-separator\" data-repo=\"{Encode(repoGroup.Key)}\">");
-            sb.AppendLine($"  <td colspan=\"9\" class=\"repo-heading\">{repoLabel} <span class=\"count-badge\">{repoGroup.Count()}</span></td>");
-            sb.AppendLine("</tr>");
 
-            foreach (var f in repoGroup)
+            string classCell = Encode(f.ClassName ?? "");
+            if (repo.BaseUrl != null && f.ClassName != null)
             {
-                // File column: link to file at line range
-                string fileCell = Encode(f.File);
-                if (baseUrl != null)
-                {
-                    var fileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
-                    fileCell = $"<a href=\"{Encode(fileUrl)}\" target=\"_blank\" title=\"{Encode(f.File)}\">{Encode(GetShortFileName(f.File))}</a>";
-                }
-
-                // Class column: link to file
-                string classCell = Encode(f.ClassName ?? "");
-                if (baseUrl != null && f.ClassName != null)
-                {
-                    var classFileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, branch);
-                    classCell = $"<a href=\"{Encode(classFileUrl)}\" target=\"_blank\">{Encode(f.ClassName)}</a>";
-                }
-
-                // Function column: link to file at exact start line
-                string funcCell = Encode(f.Function);
-                if (baseUrl != null)
-                {
-                    var funcUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
-                    funcCell = $"<a href=\"{Encode(funcUrl)}\" target=\"_blank\">{Encode(f.Function)}</a>";
-                }
-
-                var lineSeverity = GetSeverityClass(f.LineCount, 500, 300, 200);
-                var complexitySeverity = GetSeverityClass(f.CyclomaticComplexity, 30, 20, 15);
-                var nestingSeverity = GetSeverityClass(f.MaxNestingDepth, 7, 5, 3);
-
-                sb.AppendLine($"<tr data-repo=\"{Encode(f.Repo)}\">");
-                sb.AppendLine($"  <td class=\"mono\">{Encode(f.Project ?? "")}</td>");
-                sb.AppendLine($"  <td class=\"mono truncate\">{fileCell}</td>");
-                sb.AppendLine($"  <td class=\"mono truncate\">{classCell}</td>");
-                sb.AppendLine($"  <td class=\"mono\">{funcCell}</td>");
-                sb.AppendLine($"  <td class=\"numeric {lineSeverity}\" data-v=\"{f.LineCount}\">{f.LineCount}</td>");
-                sb.AppendLine($"  <td class=\"numeric {complexitySeverity}\" data-v=\"{f.CyclomaticComplexity}\">{f.CyclomaticComplexity}</td>");
-                sb.AppendLine($"  <td class=\"numeric\" data-v=\"{f.ParameterCount}\">{f.ParameterCount}</td>");
-                sb.AppendLine($"  <td class=\"numeric {nestingSeverity}\" data-v=\"{f.MaxNestingDepth}\">{f.MaxNestingDepth}</td>");
-                sb.AppendLine($"  <td>{Encode(f.Language)}</td>");
-                sb.AppendLine("</tr>");
+                var classFileUrl = AdoUrlHelper.BuildFileUrl(repo.BaseUrl, f.File, repo.DefaultBranch);
+                classCell = $"<a href=\"{Encode(classFileUrl)}\" target=\"_blank\">{Encode(f.ClassName)}</a>";
             }
-        }
 
-        sb.AppendLine("</tbody>");
-        sb.AppendLine("</table>");
-        sb.AppendLine("</div>");
-    }
-
-    private void AppendRepoBreakdown(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity)
-    {
-        sb.AppendLine("<h2>Per-Repository Breakdown</h2>");
-        sb.AppendLine("<div class=\"table-container\">");
-        sb.AppendLine("<div class=\"table-header\">");
-        sb.AppendLine("  <span style=\"color: var(--text-muted); font-size: 13px;\">Aggregated metrics per repository</span>");
-        sb.AppendLine($"  <input type=\"text\" class=\"table-filter\" placeholder=\"Filter...\" oninput=\"filterTable('repo-breakdown', this.value)\">");
-        sb.AppendLine("</div>");
-
-        sb.AppendLine("<table id=\"repo-breakdown\">");
-        sb.AppendLine("<thead><tr>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 0, 'string')\">Repository <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 1, 'number')\" class=\"numeric\">Files <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 2, 'number')\" class=\"numeric\">Functions <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 3, 'number')\" class=\"numeric\">Long <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 4, 'number')\" class=\"numeric\">Complex <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 5, 'number')\" class=\"numeric\">Avg Complexity <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 6, 'number')\" class=\"numeric\">Max Complexity <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-breakdown', 7, 'number')\" class=\"numeric\">Max Lines <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("</tr></thead>");
-        sb.AppendLine("<tbody>");
-
-        var repoGroups = data.Functions.GroupBy(f => f.Repo).OrderBy(g => g.Key);
-        foreach (var group in repoGroups)
-        {
-            var repoFunctions = group.ToList();
-            var longCount = repoFunctions.Count(f => f.LineCount >= thresholdLines);
-            var complexCount = repoFunctions.Count(f => f.CyclomaticComplexity >= thresholdComplexity);
-            var avgComplexity = repoFunctions.Count > 0 ? repoFunctions.Average(f => f.CyclomaticComplexity) : 0;
-            var maxComplexity = repoFunctions.Count > 0 ? repoFunctions.Max(f => f.CyclomaticComplexity) : 0;
-            var maxLines = repoFunctions.Count > 0 ? repoFunctions.Max(f => f.LineCount) : 0;
-            var repoInfo = data.Repos.FirstOrDefault(r => r.Name == group.Key);
-            int fileCount = repoInfo?.FileCount ?? 0;
-
-            var longSeverity = longCount > 10 ? "severity-critical" : longCount > 3 ? "severity-high" : longCount > 0 ? "severity-medium" : "severity-ok";
-            var complexSeverity = complexCount > 10 ? "severity-critical" : complexCount > 3 ? "severity-high" : complexCount > 0 ? "severity-medium" : "severity-ok";
-
-            string repoCell = Encode(group.Key);
-            if (repoInfo?.AdoBaseUrl != null)
+            string funcCell = Encode(f.Function);
+            if (repo.BaseUrl != null)
             {
-                repoCell = $"<a href=\"{Encode(repoInfo.AdoBaseUrl)}\" target=\"_blank\">{Encode(group.Key)}</a>";
+                var funcUrl = AdoUrlHelper.BuildFileUrl(repo.BaseUrl, f.File, f.StartLine, f.EndLine, repo.DefaultBranch);
+                funcCell = $"<a href=\"{Encode(funcUrl)}\" target=\"_blank\">{Encode(f.Function)}</a>";
             }
+
+            var lineSeverity = GetSeverityClass(f.LineCount, 500, 300, 200);
+            var complexitySeverity = GetSeverityClass(f.CyclomaticComplexity, 30, 20, 15);
+            var nestingSeverity = GetSeverityClass(f.MaxNestingDepth, 7, 5, 3);
 
             sb.AppendLine("<tr>");
-            sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
-            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{fileCount}\">{fileCount}</td>");
-            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{repoFunctions.Count}\">{repoFunctions.Count}</td>");
-            sb.AppendLine($"  <td class=\"numeric {longSeverity}\" data-v=\"{longCount}\">{longCount}</td>");
-            sb.AppendLine($"  <td class=\"numeric {complexSeverity}\" data-v=\"{complexCount}\">{complexCount}</td>");
-            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{avgComplexity:F1}\">{avgComplexity:F1}</td>");
-            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{maxComplexity}\">{maxComplexity}</td>");
-            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{maxLines}\">{maxLines}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{Encode(f.Project ?? "")}</td>");
+            sb.AppendLine($"  <td class=\"mono truncate\">{fileCell}</td>");
+            sb.AppendLine($"  <td class=\"mono truncate\">{classCell}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{funcCell}</td>");
+            sb.AppendLine($"  <td class=\"numeric {lineSeverity}\" data-v=\"{f.LineCount}\">{f.LineCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric {complexitySeverity}\" data-v=\"{f.CyclomaticComplexity}\">{f.CyclomaticComplexity}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{f.ParameterCount}\">{f.ParameterCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric {nestingSeverity}\" data-v=\"{f.MaxNestingDepth}\">{f.MaxNestingDepth}</td>");
             sb.AppendLine("</tr>");
         }
 
@@ -600,31 +670,15 @@ function sortTable(tableId, colIndex, type) {
 }
 
 function filterTable(tableId, query) {
-    const table = document.getElementById(tableId);
-    const rows = table.querySelectorAll('tbody tr');
-    const q = query.toLowerCase();
-    const repoFilter = (tableFilters[tableId] || '');
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var rows = table.querySelectorAll('tbody tr');
+    var q = query.toLowerCase();
 
-    rows.forEach(row => {
-        if (row.classList.contains('repo-separator')) {
-            var repo = row.getAttribute('data-repo') || '';
-            row.style.display = (!repoFilter || repo === repoFilter) ? '' : 'none';
-            return;
-        }
-        var rowRepo = row.getAttribute('data-repo') || '';
+    rows.forEach(function(row) {
         var text = row.textContent.toLowerCase();
-        var matchesRepo = !repoFilter || rowRepo === repoFilter;
-        var matchesText = !q || text.includes(q);
-        row.style.display = (matchesRepo && matchesText) ? '' : 'none';
+        row.style.display = (!q || text.includes(q)) ? '' : 'none';
     });
-}
-
-const tableFilters = {};
-
-function filterByRepoGroup(tableId, repo) {
-    tableFilters[tableId] = repo;
-    var textInput = document.getElementById(tableId)?.closest('.table-container')?.querySelector('input.table-filter');
-    filterTable(tableId, textInput?.value || '');
 }
 ";
 
