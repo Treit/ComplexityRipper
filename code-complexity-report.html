@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Complexity Report</title>
+<style>
+
+:root {
+    --bg: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --orange: #db6d28;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; }
+.container { max-width: 1400px; margin: 0 auto; }
+h1 { font-size: 28px; margin-bottom: 8px; }
+h2 { font-size: 22px; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 16px 0 8px 0; }
+.subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Summary cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+.card .value { font-size: 32px; font-weight: 700; }
+.card .label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.card.ok .value { color: var(--green); }
+.card.warn .value { color: var(--yellow); }
+.card.danger .value { color: var(--red); }
+.card.critical .value { color: var(--red); font-weight: 900; }
+.card.info .value { color: var(--blue); }
+
+/* Tables */
+.table-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+.table-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.table-header h3 { margin: 0; }
+.table-filter { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 6px 10px; font-size: 13px; width: 250px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead { background: var(--bg-tertiary); }
+th { padding: 10px 12px; text-align: left; font-weight: 600; cursor: pointer; white-space: nowrap; user-select: none; }
+th:hover { background: var(--border); }
+th .sort-arrow { margin-left: 4px; font-size: 10px; color: var(--text-muted); }
+td { padding: 8px 12px; border-top: 1px solid var(--border); }
+tr:hover { background: var(--bg-tertiary); }
+.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.severity-critical { color: var(--red); font-weight: 700; }
+.severity-high { color: var(--orange); font-weight: 600; }
+.severity-medium { color: var(--yellow); }
+.severity-ok { color: var(--green); }
+.mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; }
+.truncate { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.count-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+
+/* Charts */
+.chart-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.bar-chart { display: flex; flex-direction: column; gap: 6px; }
+.bar-row { display: flex; align-items: center; gap: 8px; }
+.bar-label { width: 100px; text-align: right; font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
+.bar-track { flex: 1; background: var(--bg-tertiary); border-radius: 3px; height: 22px; position: relative; }
+.bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: fit-content; }
+.bar-count { font-size: 12px; color: var(--text-muted); margin-left: 8px; flex-shrink: 0; width: 60px; }
+
+/* Language breakdown */
+.lang-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.lang-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; padding: 12px; text-align: center; }
+.lang-name { font-size: 14px; font-weight: 600; }
+.lang-stats { font-size: 12px; color: var(--text-muted); }
+
+@media (max-width: 768px) {
+    .chart-grid { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .table-filter { width: 150px; }
+}
+
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📊 Code Complexity Report</h1>
+<p class="subtitle">Generated 2026-03-23 18:58:48 UTC &nbsp;|&nbsp; Thresholds: 200 lines, 15 complexity &nbsp;|&nbsp; Root: C:\src\CostManagement\</p>
+<div class="cards">
+<div class="card info">
+  <div class="value">5</div>
+  <div class="label">Repositories</div>
+</div>
+<div class="card info">
+  <div class="value">2</div>
+  <div class="label">Files Analyzed</div>
+</div>
+<div class="card info">
+  <div class="value">6</div>
+  <div class="label">Functions</div>
+</div>
+<div class="card ok">
+  <div class="value">0</div>
+  <div class="label">Long Functions</div>
+</div>
+<div class="card ok">
+  <div class="value">0</div>
+  <div class="label">Complex Functions</div>
+</div>
+<div class="card ok">
+  <div class="value">0</div>
+  <div class="label">Combined Risk</div>
+</div>
+</div>
+<h2>Language Breakdown</h2>
+<div class="lang-grid">
+<div class="lang-card">
+  <div class="lang-name">C#</div>
+  <div class="lang-stats">6 functions</div>
+  <div class="lang-stats">2 files</div>
+</div>
+</div>
+<h2>Distribution</h2>
+<div class="chart-container">
+<div class="chart-grid">
+<div>
+<h3>Function Length (lines)</h3>
+<div class="bar-chart">
+<div class="bar-row">
+  <span class="bar-label">0–50</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 100.0%; background: var(--green);">6</div></div>
+  <span class="bar-count">6</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">51–100</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--green);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">101–200</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--yellow);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">201–500</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--orange);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">500+</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--red);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+</div>
+</div>
+<div>
+<h3>Cyclomatic Complexity</h3>
+<div class="bar-chart">
+<div class="bar-row">
+  <span class="bar-label">1–5</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 100.0%; background: var(--green);">6</div></div>
+  <span class="bar-count">6</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">6–10</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--green);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">11–15</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--yellow);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">16–25</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--orange);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+<div class="bar-row">
+  <span class="bar-label">25+</span>
+  <div class="bar-track"><div class="bar-fill" style="width: 0.0%; background: var(--red);"></div></div>
+  <span class="bar-count">0</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<h2>⚠️ Combined Risk — Long AND Complex</h2>
+<p style="color: var(--green);">No functions exceed both thresholds. 🎉</p>
+<h2>Long Functions <span class="count-badge">0</span></h2>
+<div class="table-container">
+<div class="table-header">
+  <span style="color: var(--text-muted); font-size: 13px;">Functions with 200+ lines</span>
+  <input type="text" class="table-filter" placeholder="Filter..." oninput="filterTable('long-functions', this.value)">
+</div>
+<table id="long-functions">
+<thead><tr>
+<th onclick="sortTable('long-functions', 0, 'string')">Repo <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 1, 'string')">File <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 2, 'string')">Class <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 3, 'string')">Function <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 4, 'number')" class="numeric">Lines <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 5, 'number')" class="numeric">Complexity <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 6, 'number')" class="numeric">Params <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 7, 'number')" class="numeric">Nesting <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('long-functions', 8, 'string')">Language <span class="sort-arrow">⇅</span></th>
+</tr></thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<h2>High Complexity Functions <span class="count-badge">0</span></h2>
+<div class="table-container">
+<div class="table-header">
+  <span style="color: var(--text-muted); font-size: 13px;">Functions with cyclomatic complexity ≥ 15</span>
+  <input type="text" class="table-filter" placeholder="Filter..." oninput="filterTable('complex-functions', this.value)">
+</div>
+<table id="complex-functions">
+<thead><tr>
+<th onclick="sortTable('complex-functions', 0, 'string')">Repo <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 1, 'string')">File <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 2, 'string')">Class <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 3, 'string')">Function <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 4, 'number')" class="numeric">Lines <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 5, 'number')" class="numeric">Complexity <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 6, 'number')" class="numeric">Params <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 7, 'number')" class="numeric">Nesting <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('complex-functions', 8, 'string')">Language <span class="sort-arrow">⇅</span></th>
+</tr></thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<h2>Per-Repository Breakdown</h2>
+<div class="table-container">
+<div class="table-header">
+  <span style="color: var(--text-muted); font-size: 13px;">Aggregated metrics per repository</span>
+  <input type="text" class="table-filter" placeholder="Filter..." oninput="filterTable('repo-breakdown', this.value)">
+</div>
+<table id="repo-breakdown">
+<thead><tr>
+<th onclick="sortTable('repo-breakdown', 0, 'string')">Repository <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 1, 'number')" class="numeric">Files <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 2, 'number')" class="numeric">Functions <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 3, 'number')" class="numeric">Long <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 4, 'number')" class="numeric">Complex <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 5, 'number')" class="numeric">Avg Complexity <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 6, 'number')" class="numeric">Max Complexity <span class="sort-arrow">⇅</span></th>
+<th onclick="sortTable('repo-breakdown', 7, 'number')" class="numeric">Max Lines <span class="sort-arrow">⇅</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td class="mono">src</td>
+  <td class="numeric" data-v="2">2</td>
+  <td class="numeric" data-v="6">6</td>
+  <td class="numeric severity-ok" data-v="0">0</td>
+  <td class="numeric severity-ok" data-v="0">0</td>
+  <td class="numeric" data-v="1.2">1.2</td>
+  <td class="numeric" data-v="2">2</td>
+  <td class="numeric" data-v="10">10</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div style="text-align: center; margin-top: 40px; padding: 20px; color: var(--text-muted); font-size: 12px;">
+  Generated by CodeAnalyzer — Roslyn + Lizard hybrid analysis
+</div>
+</div>
+<script>
+
+const sortState = {};
+
+function sortTable(tableId, colIndex, type) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    const key = tableId + '_' + colIndex;
+    sortState[key] = sortState[key] === 'asc' ? 'desc' : 'asc';
+    const ascending = sortState[key] === 'asc';
+    
+    rows.sort((a, b) => {
+        const cellA = a.cells[colIndex];
+        const cellB = b.cells[colIndex];
+        let valA, valB;
+        
+        if (type === 'number') {
+            valA = parseFloat(cellA.getAttribute('data-v') || cellA.textContent) || 0;
+            valB = parseFloat(cellB.getAttribute('data-v') || cellB.textContent) || 0;
+        } else {
+            valA = (cellA.textContent || '').toLowerCase();
+            valB = (cellB.textContent || '').toLowerCase();
+        }
+        
+        if (valA < valB) return ascending ? -1 : 1;
+        if (valA > valB) return ascending ? 1 : -1;
+        return 0;
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Update sort arrows
+    const headers = table.querySelectorAll('th');
+    headers.forEach((th, i) => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.textContent = i === colIndex ? (ascending ? '↑' : '↓') : '⇅';
+    });
+}
+
+function filterTable(tableId, query) {
+    const table = document.getElementById(tableId);
+    const rows = table.querySelectorAll('tbody tr');
+    const q = query.toLowerCase();
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+
+</script>
+</body>
+</html>

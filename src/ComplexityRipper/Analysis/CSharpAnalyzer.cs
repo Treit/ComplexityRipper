@@ -20,9 +20,7 @@ public class CSharpAnalyzer
             Metadata = { RootPath = rootPath, GeneratedAt = DateTimeOffset.UtcNow }
         };
 
-        var repoDirs = Directory.GetDirectories(rootPath)
-            .Where(d => !Path.GetFileName(d).StartsWith('.'))
-            .ToList();
+        var repoDirs = ResolveRepoDirs(rootPath);
 
         var allFunctions = new System.Collections.Concurrent.ConcurrentBag<FunctionMetrics>();
         var repoInfos = new System.Collections.Concurrent.ConcurrentBag<RepoInfo>();
@@ -82,6 +80,23 @@ public class CSharpAnalyzer
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Determines whether rootPath is itself a git repo or a directory containing multiple repos.
+    /// If rootPath contains a .git directory, it is treated as a single repo.
+    /// Otherwise, each subdirectory is treated as a separate repo.
+    /// </summary>
+    private static List<string> ResolveRepoDirs(string rootPath)
+    {
+        if (Directory.Exists(Path.Combine(rootPath, ".git")))
+        {
+            return [rootPath];
+        }
+
+        return Directory.GetDirectories(rootPath)
+            .Where(d => !Path.GetFileName(d).StartsWith('.'))
+            .ToList();
     }
 
     /// <summary>

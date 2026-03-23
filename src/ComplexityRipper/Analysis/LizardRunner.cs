@@ -206,6 +206,14 @@ public class LizardRunner
         }
 
         var relative = normalizedFull[(normalizedRoot.Length + 1)..];
+
+        // If rootPath is itself a git repo, the repo name is the root directory name
+        // and the relative path is the full relative path from root.
+        if (Directory.Exists(Path.Combine(rootPath, ".git")))
+        {
+            return (Path.GetFileName(normalizedRoot), relative);
+        }
+
         var separatorIndex = relative.IndexOf(Path.DirectorySeparatorChar);
         if (separatorIndex < 0)
         {
