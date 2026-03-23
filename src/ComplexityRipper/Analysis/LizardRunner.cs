@@ -104,7 +104,8 @@ public class LizardRunner
                     continue;
                 }
 
-                // NLOC, CCN, Token, PARAM, Length, Location, File, Function, Start, End
+                // NLOC, CCN, Token, PARAM, Length, Location, File, Function, LongName, Start, End
+                // Lizard CSV has 11 columns; start/end are the last two
                 if (!int.TryParse(parts[0].Trim(), out int nloc))
                 {
                     continue;
@@ -122,8 +123,8 @@ public class LizardRunner
 
                 var filePath = parts[6].Trim().Trim('"');
                 var functionName = parts[7].Trim().Trim('"');
-                var startLinePart = parts[8].Trim().Trim('"');
-                var endLinePart = parts[9].Trim().Trim('"');
+                var startLinePart = parts[^2].Trim().Trim('"');
+                var endLinePart = parts[^1].Trim().Trim('"');
 
                 if (!int.TryParse(startLinePart, out int startLine))
                 {
