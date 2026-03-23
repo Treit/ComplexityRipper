@@ -268,7 +268,7 @@ tr:hover { background: var(--bg-tertiary); }
 
     private void AppendCombinedRiskTable(StringBuilder sb, List<FunctionMetrics> functions, Dictionary<string, RepoInfo> repoLookup)
     {
-        sb.AppendLine("<h2>⚠️ Combined Risk — Long AND Complex</h2>");
+        sb.AppendLine($"<h2>⚠️ Combined Risk — Long AND Complex <span class=\"count-badge\">{functions.Count}</span></h2>");
         if (functions.Count == 0)
         {
             sb.AppendLine("<p style=\"color: var(--green);\">No functions exceed both thresholds. 🎉</p>");
