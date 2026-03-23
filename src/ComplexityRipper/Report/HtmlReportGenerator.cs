@@ -410,23 +410,16 @@ tr:hover { background: var(--bg-tertiary); }
         int rank = 1;
         foreach (var r in repoStats)
         {
-            string repoCell = Encode(r.Name);
-            if (r.BaseUrl != null)
-            {
-                repoCell = $"<a href=\"{Encode(r.BaseUrl)}\" target=\"_blank\">{Encode(r.Name)}</a>";
-            }
-
             var scoreSeverity = r.ConcernScore >= 50 ? "severity-critical" : r.ConcernScore >= 20 ? "severity-high" : r.ConcernScore >= 5 ? "severity-medium" : "severity-ok";
             var combinedSeverity = r.CombinedCount > 5 ? "severity-critical" : r.CombinedCount > 0 ? "severity-high" : "";
 
-            // Link repo name to its detail section
-            var anchorLink = r.ConcernScore > 0
-                ? $"<a href=\"#repo-{Encode(r.Name.Replace(" ", "-"))}\">{repoCell}</a>"
-                : repoCell;
+            string repoCell = r.ConcernScore > 0
+                ? $"<a href=\"#repo-{Encode(r.Name.Replace(" ", "-"))}\">{Encode(r.Name)}</a>"
+                : Encode(r.Name);
 
             sb.AppendLine("<tr>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{rank}\">{rank}</td>");
-            sb.AppendLine($"  <td class=\"mono\">{anchorLink}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
             sb.AppendLine($"  <td class=\"numeric {scoreSeverity}\" data-v=\"{r.ConcernScore}\">{r.ConcernScore}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.FileCount}\">{r.FileCount}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.FunctionCount}\">{r.FunctionCount}</td>");
