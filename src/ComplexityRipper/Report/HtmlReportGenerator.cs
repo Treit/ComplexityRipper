@@ -110,27 +110,6 @@ public class HtmlReportGenerator
     --bar-5: #cf222e;
 }
 
-/* ── Colorblind-safe (blue / orange / purple palette, no red-green) ── */
-[data-theme=""colorblind""] {
-    --bg: #fafbfc;
-    --bg-secondary: #f0f2f5;
-    --bg-tertiary: #e4e7eb;
-    --border: #c9cdd3;
-    --text: #24292f;
-    --text-muted: #57606a;
-    --link: #0550ae;
-    --severity-ok: #0550ae;
-    --severity-medium: #e16f24;
-    --severity-high: #c93c00;
-    --severity-critical: #8b1a00;
-    --info: #0550ae;
-    --bar-1: #0550ae;
-    --bar-2: #2c7bb6;
-    --bar-3: #e16f24;
-    --bar-4: #c93c00;
-    --bar-5: #8b1a00;
-}
-
 /* ── High-contrast dark ── */
 [data-theme=""high-contrast""] {
     --bg: #000000;
@@ -253,7 +232,6 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("  <select onchange=\"setTheme(this.value)\" id=\"theme-select\">");
         sb.AppendLine("    <option value=\"dark\">Dark</option>");
         sb.AppendLine("    <option value=\"light\">Light</option>");
-        sb.AppendLine("    <option value=\"colorblind\">Colorblind-safe</option>");
         sb.AppendLine("    <option value=\"high-contrast\">High contrast</option>");
         sb.AppendLine("    <option value=\"ink\">Ink (print)</option>");
         sb.AppendLine("  </select>");
