@@ -113,17 +113,41 @@ public static class AdoUrlHelper
             var urlPart = fetchIdx >= 0 ? urlAndSuffix[..fetchIdx].Trim() : urlAndSuffix.Trim();
 
             // ADO HTTPS: https://msdata@dev.azure.com/msdata/Sentinel%20Graph/_git/NEXT
-            if (urlPart.Contains("dev.azure.com") && urlPart.Contains("/_git/"))
+            // Legacy:   https://msdata.visualstudio.com/DefaultCollection/Sentinel%20Graph/_git/PerfBenchInfra
+            if ((urlPart.Contains("dev.azure.com") || urlPart.Contains("visualstudio.com")) && urlPart.Contains("/_git/"))
             {
                 var uri = new Uri(urlPart.Replace(" ", "%20"));
                 var segments = uri.AbsolutePath.Trim('/').Split('/');
 
-                if (segments.Length >= 4 && segments[^2] == "_git")
+                // Find the _git segment and extract project + repo from around it
+                int gitIdx = Array.IndexOf(segments, "_git");
+                if (gitIdx >= 1 && gitIdx < segments.Length - 1)
                 {
-                    var org = segments[0];
-                    var project = Uri.EscapeDataString(Uri.UnescapeDataString(
-                        string.Join("/", segments[1..^2])));
-                    var repo = segments[^1];
+                    var repo = segments[gitIdx + 1];
+
+                    // For dev.azure.com: /{org}/{project}/_git/{repo}
+                    // For visualstudio.com: /DefaultCollection/{project}/_git/{repo}
+                    // We need the org. For visualstudio.com, org is the subdomain.
+                    string org;
+                    string project;
+
+                    if (urlPart.Contains("dev.azure.com"))
+                    {
+                        org = segments[0];
+                        project = Uri.EscapeDataString(Uri.UnescapeDataString(
+                            string.Join("/", segments[1..gitIdx])));
+                    }
+                    else
+                    {
+                        // visualstudio.com: org is the subdomain (e.g., msdata.visualstudio.com -> msdata)
+                        org = uri.Host.Split('.')[0];
+                        // Project is everything between DefaultCollection (or first segment) and _git
+                        var projectSegments = segments.TakeWhile(s => s != "_git")
+                            .Where(s => !s.Equals("DefaultCollection", StringComparison.OrdinalIgnoreCase))
+                            .ToArray();
+                        project = Uri.EscapeDataString(Uri.UnescapeDataString(
+                            string.Join("/", projectSegments)));
+                    }
 
                     return $"https://dev.azure.com/{org}/{project}/_git/{repo}";
                 }

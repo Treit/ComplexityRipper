@@ -15,6 +15,16 @@ public class AdoUrlHelperTests
     }
 
     [Fact]
+    public void ParseRemoteUrl_VisualStudioCom_ExtractsCorrectUrl()
+    {
+        var remoteOutput = "origin\thttps://msdata.visualstudio.com/DefaultCollection/Sentinel%20Graph/_git/PerfBenchInfra (fetch)\norigin\thttps://msdata.visualstudio.com/DefaultCollection/Sentinel%20Graph/_git/PerfBenchInfra (push)\n";
+        var result = AdoUrlHelper.ParseRemoteUrl(remoteOutput);
+
+        Assert.NotNull(result);
+        Assert.Equal("https://dev.azure.com/msdata/Sentinel%20Graph/_git/PerfBenchInfra", result);
+    }
+
+    [Fact]
     public void ParseAdoBaseUrl_SshFormat_ExtractsCorrectUrl()
     {
         var remoteOutput = "origin\tgit@ssh.dev.azure.com:v3/msdata/Sentinel Graph/NEXT (fetch)\norigin\tgit@ssh.dev.azure.com:v3/msdata/Sentinel Graph/NEXT (push)\n";        var result = AdoUrlHelper.ParseAdoBaseUrl(remoteOutput, "NEXT");
