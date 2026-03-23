@@ -123,12 +123,6 @@ public class LizardRunner
                 }
 
                 var filePath = parts[6].Trim().Trim('"');
-
-                if (!CSharpAnalyzer.PassesFilter(filePath, includeFilter, excludeFilter))
-                {
-                    continue;
-                }
-
                 var functionName = parts[7].Trim().Trim('"');
                 var startLinePart = parts[^2].Trim().Trim('"');
                 var endLinePart = parts[^1].Trim().Trim('"');
@@ -145,7 +139,7 @@ public class LizardRunner
 
                 // Determine repo and relative path
                 var (repoName, relativePath) = ResolveRepoPath(filePath, rootPath);
-                if (repoName == null)
+                if (repoName == null || !CSharpAnalyzer.PassesFilter(repoName, includeFilter, excludeFilter))
                 {
                     continue;
                 }

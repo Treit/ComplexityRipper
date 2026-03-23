@@ -29,6 +29,13 @@ public class CSharpAnalyzer
         Parallel.ForEach(repoDirs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, repoDir =>
         {
             var repoName = Path.GetFileName(repoDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+            if (!PassesFilter(repoName, includeFilter, excludeFilter))
+            {
+                onProgress?.Invoke($"Skipping {repoName} (filtered)");
+                return;
+            }
+
             onProgress?.Invoke($"Scanning {repoName}...");
 
             var adoBaseUrl = Utilities.AdoUrlHelper.GetAdoBaseUrl(repoDir);
@@ -39,7 +46,6 @@ public class CSharpAnalyzer
             var csFiles = Directory.EnumerateFiles(repoDir, "*.cs", SearchOption.AllDirectories)
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                          && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-                .Where(f => PassesFilter(f, includeFilter, excludeFilter))
                 .ToList();
 
             int functionCount = 0;

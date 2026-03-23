@@ -21,8 +21,8 @@ var analyzeCommand = new Command("analyze", "Scan repositories and generate anal
 var rootPathOption = new Option<string>("--root", "Root directory containing repos to analyze") { IsRequired = true };
 var outputOption = new Option<string>("--output", () => "stats.json", "Output JSON file path");
 var csharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
-var includeOption = new Option<string?>("--include", "Regex to include file paths (use | for OR). Only matching paths are analyzed");
-var excludeOption = new Option<string?>("--exclude", "Regex to exclude file paths (use | for OR). Matching paths are skipped");
+var includeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
+var excludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
 analyzeCommand.AddOption(rootPathOption);
 analyzeCommand.AddOption(outputOption);
 analyzeCommand.AddOption(csharpOnlyOption);
@@ -136,8 +136,8 @@ var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "L
 var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
 var runCsharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
 var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
-var runIncludeOption = new Option<string?>("--include", "Regex to include file paths (use | for OR). Only matching paths are analyzed");
-var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude file paths (use | for OR). Matching paths are skipped");
+var runIncludeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
+var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
 runCommand.AddOption(runRootOption);
 runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
