@@ -231,16 +231,10 @@ a:hover { text-decoration: underline; }
 .theme-switcher label { font-size: 12px; color: var(--text-muted); }
 .theme-switcher select { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 12px; cursor: pointer; }
 
-/* Summary cards */
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
-.card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
-.card .value { font-size: 32px; font-weight: 700; }
-.card .label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-.card.ok .value { color: var(--severity-ok); }
-.card.warn .value { color: var(--severity-medium); }
-.card.danger .value { color: var(--severity-critical); }
-.card.critical .value { color: var(--severity-critical); font-weight: 900; }
-.card.info .value { color: var(--info); }
+/* Summary table */
+.summary-table { border-collapse: collapse; margin-bottom: 24px; font-size: 15px; }
+.summary-table td { padding: 6px 20px 6px 0; color: var(--text-muted); white-space: nowrap; border: none; }
+.summary-value { font-weight: 700; font-size: 18px; color: var(--text); margin-right: 4px; }
 
 /* Tables */
 .table-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; margin-bottom: 24px; }
@@ -316,22 +310,18 @@ tr:hover { background: var(--bg-tertiary); }
 
     private void AppendSummaryCards(StringBuilder sb, AnalysisResult data, int longCount, int complexCount, int combinedCount)
     {
-        sb.AppendLine("<div class=\"cards\">");
-        AppendCard(sb, data.Summary.TotalRepos.ToString("N0"), "Repositories", "info");
-        AppendCard(sb, data.Summary.TotalFiles.ToString("N0"), "Files Analyzed", "info");
-        AppendCard(sb, data.Summary.TotalFunctions.ToString("N0"), "Functions", "info");
-        AppendCard(sb, longCount.ToString("N0"), "Long Functions", longCount > 100 ? "danger" : longCount > 20 ? "warn" : "ok");
-        AppendCard(sb, complexCount.ToString("N0"), "Complex Functions", complexCount > 100 ? "danger" : complexCount > 20 ? "warn" : "ok");
-        AppendCard(sb, combinedCount.ToString("N0"), "Combined Risk", combinedCount > 50 ? "critical" : combinedCount > 10 ? "danger" : combinedCount > 0 ? "warn" : "ok");
-        sb.AppendLine("</div>");
-    }
+        var longClass = longCount > 100 ? "severity-critical" : longCount > 20 ? "severity-high" : longCount > 0 ? "severity-medium" : "";
+        var complexClass = complexCount > 100 ? "severity-critical" : complexCount > 20 ? "severity-high" : complexCount > 0 ? "severity-medium" : "";
+        var combinedClass = combinedCount > 50 ? "severity-critical" : combinedCount > 10 ? "severity-high" : combinedCount > 0 ? "severity-medium" : "";
 
-    private void AppendCard(StringBuilder sb, string value, string label, string cssClass)
-    {
-        sb.AppendLine($"<div class=\"card {cssClass}\">");
-        sb.AppendLine($"  <div class=\"value\">{value}</div>");
-        sb.AppendLine($"  <div class=\"label\">{label}</div>");
-        sb.AppendLine("</div>");
+        sb.AppendLine("<table class=\"summary-table\"><tbody><tr>");
+        sb.AppendLine($"<td><span class=\"summary-value\">{data.Summary.TotalRepos:N0}</span> repos</td>");
+        sb.AppendLine($"<td><span class=\"summary-value\">{data.Summary.TotalFiles:N0}</span> files</td>");
+        sb.AppendLine($"<td><span class=\"summary-value\">{data.Summary.TotalFunctions:N0}</span> functions</td>");
+        sb.AppendLine($"<td><span class=\"summary-value {longClass}\">{longCount:N0}</span> long</td>");
+        sb.AppendLine($"<td><span class=\"summary-value {complexClass}\">{complexCount:N0}</span> complex</td>");
+        sb.AppendLine($"<td><span class=\"summary-value {combinedClass}\">{combinedCount:N0}</span> combined risk</td>");
+        sb.AppendLine("</tr></tbody></table>");
     }
 
     private void AppendLanguageBreakdown(StringBuilder sb, AnalysisResult data)
