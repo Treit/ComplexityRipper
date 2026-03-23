@@ -231,9 +231,10 @@ a:hover { text-decoration: underline; }
 .theme-switcher select { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 12px; cursor: pointer; }
 
 /* Summary table */
-.summary-table { border-collapse: collapse; margin-bottom: 24px; font-size: 15px; }
-.summary-table td { padding: 6px 20px 6px 0; color: var(--text-muted); white-space: nowrap; border: none; }
-.summary-value { font-weight: 700; font-size: 18px; color: var(--text); margin-right: 4px; }
+.summary-table { border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+.summary-table td { padding: 4px 16px 4px 0; white-space: nowrap; border: none; }
+.summary-table td:first-child { color: var(--text-muted); }
+.summary-table td:last-child { font-weight: 600; }
 
 /* Tables */
 .table-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; margin-bottom: 24px; }
@@ -307,14 +308,14 @@ tr:hover { background: var(--bg-tertiary); }
         var complexClass = complexCount > 100 ? "severity-critical" : complexCount > 20 ? "severity-high" : complexCount > 0 ? "severity-medium" : "";
         var combinedClass = combinedCount > 50 ? "severity-critical" : combinedCount > 10 ? "severity-high" : combinedCount > 0 ? "severity-medium" : "";
 
-        sb.AppendLine("<table class=\"summary-table\"><tbody><tr>");
-        sb.AppendLine($"<td><span class=\"summary-value\">{data.Summary.TotalRepos:N0}</span> repos</td>");
-        sb.AppendLine($"<td><span class=\"summary-value\">{data.Summary.TotalFiles:N0}</span> files</td>");
-        sb.AppendLine($"<td><span class=\"summary-value\">{data.Summary.TotalFunctions:N0}</span> functions</td>");
-        sb.AppendLine($"<td><span class=\"summary-value {longClass}\">{longCount:N0}</span> long</td>");
-        sb.AppendLine($"<td><span class=\"summary-value {complexClass}\">{complexCount:N0}</span> complex</td>");
-        sb.AppendLine($"<td><span class=\"summary-value {combinedClass}\">{combinedCount:N0}</span> combined risk</td>");
-        sb.AppendLine("</tr></tbody></table>");
+        sb.AppendLine("<table class=\"summary-table\"><tbody>");
+        sb.AppendLine($"<tr><td>Repositories</td><td>{data.Summary.TotalRepos:N0}</td></tr>");
+        sb.AppendLine($"<tr><td>Files analyzed</td><td>{data.Summary.TotalFiles:N0}</td></tr>");
+        sb.AppendLine($"<tr><td>Functions</td><td>{data.Summary.TotalFunctions:N0}</td></tr>");
+        sb.AppendLine($"<tr><td>Long functions</td><td class=\"{longClass}\">{longCount:N0}</td></tr>");
+        sb.AppendLine($"<tr><td>Complex functions</td><td class=\"{complexClass}\">{complexCount:N0}</td></tr>");
+        sb.AppendLine($"<tr><td>Combined risk</td><td class=\"{combinedClass}\">{combinedCount:N0}</td></tr>");
+        sb.AppendLine("</tbody></table>");
     }
 
     private void AppendDistributionCharts(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity)
