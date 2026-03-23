@@ -22,12 +22,14 @@ var rootPathOption = new Option<string>("--root", "Root directory containing rep
 var outputOption = new Option<string>("--output", () => "stats.json", "Output JSON file path");
 var includeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
 var excludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
+var includeTestsOption = new Option<bool>("--include-tests", () => false, "Include test projects (excluded by default)");
 analyzeCommand.AddOption(rootPathOption);
 analyzeCommand.AddOption(outputOption);
 analyzeCommand.AddOption(includeOption);
 analyzeCommand.AddOption(excludeOption);
+analyzeCommand.AddOption(includeTestsOption);
 
-analyzeCommand.SetHandler(async (string root, string output, string? include, string? exclude) =>
+analyzeCommand.SetHandler(async (string root, string output, string? include, string? exclude, bool includeTests) =>
 {
     if (!Directory.Exists(root))
     {
@@ -52,7 +54,7 @@ analyzeCommand.SetHandler(async (string root, string output, string? include, st
     Console.WriteLine();
 
     var analyzer = new CSharpAnalyzer();
-    var result = analyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  {msg}"), includeFilter, excludeFilter);
+    var result = analyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  {msg}"), includeFilter, excludeFilter, includeTests);
 
     Console.WriteLine($"Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
 
@@ -60,7 +62,7 @@ analyzeCommand.SetHandler(async (string root, string output, string? include, st
     await File.WriteAllTextAsync(output, json);
     Console.WriteLine($"Stats written to: {output}");
 
-}, rootPathOption, outputOption, includeOption, excludeOption);
+}, rootPathOption, outputOption, includeOption, excludeOption, includeTestsOption);
 
 // report command — reads JSON and generates HTML
 var reportCommand = new Command("report", "Generate HTML report from analysis JSON");
@@ -110,6 +112,7 @@ var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () 
 var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 var runIncludeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
 var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
+var runIncludeTestsOption = new Option<bool>("--include-tests", () => false, "Include test projects (excluded by default)");
 runCommand.AddOption(runRootOption);
 runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
@@ -118,6 +121,7 @@ runCommand.AddOption(runThresholdComplexityOption);
 runCommand.AddOption(runThemeOption);
 runCommand.AddOption(runIncludeOption);
 runCommand.AddOption(runExcludeOption);
+runCommand.AddOption(runIncludeTestsOption);
 
 runCommand.SetHandler(async (InvocationContext ctx) =>
 {
@@ -129,6 +133,7 @@ runCommand.SetHandler(async (InvocationContext ctx) =>
     var theme = ctx.ParseResult.GetValueForOption(runThemeOption)!;
     var include = ctx.ParseResult.GetValueForOption(runIncludeOption);
     var exclude = ctx.ParseResult.GetValueForOption(runExcludeOption);
+    var includeTests = ctx.ParseResult.GetValueForOption(runIncludeTestsOption);
     if (!Directory.Exists(root))
     {
         Console.Error.WriteLine($"Error: Directory not found: {root}");
@@ -153,7 +158,7 @@ runCommand.SetHandler(async (InvocationContext ctx) =>
     Console.WriteLine();
 
     var analyzer = new CSharpAnalyzer();
-    var result = analyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  {msg}"), includeFilter, excludeFilter);
+    var result = analyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  {msg}"), includeFilter, excludeFilter, includeTests);
 
     Console.WriteLine($"Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
 

@@ -14,7 +14,7 @@ public class CSharpAnalyzer
     /// <summary>
     /// Analyzes all .cs files under the given repo directories, running in parallel for performance.
     /// </summary>
-    public AnalysisResult AnalyzeRepos(string rootPath, Action<string>? onProgress = null, Regex? includeFilter = null, Regex? excludeFilter = null)
+    public AnalysisResult AnalyzeRepos(string rootPath, Action<string>? onProgress = null, Regex? includeFilter = null, Regex? excludeFilter = null, bool includeTestCode = false)
     {
         var result = new AnalysisResult
         {
@@ -49,10 +49,18 @@ public class CSharpAnalyzer
                 .ToList();
 
             int functionCount = 0;
+            int fileCount = 0;
             var projectResolver = new ProjectResolver(repoDir);
             foreach (var file in csFiles)
             {
                 var projectName = projectResolver.GetProjectName(file);
+
+                if (!includeTestCode && IsTestProject(projectName))
+                {
+                    continue;
+                }
+
+                fileCount++;
                 var functions = AnalyzeFile(file, repoDir, repoName);
                 foreach (var func in functions)
                 {
@@ -67,7 +75,7 @@ public class CSharpAnalyzer
                 Name = repoName,
                 AdoBaseUrl = adoBaseUrl,
                 DefaultBranch = defaultBranch,
-                FileCount = csFiles.Count,
+                FileCount = fileCount,
                 FunctionCount = functionCount,
             });
         });
@@ -128,6 +136,19 @@ public class CSharpAnalyzer
         }
 
         return true;
+    }
+
+    private static bool IsTestProject(string? projectName)
+    {
+        if (string.IsNullOrEmpty(projectName))
+        {
+            return false;
+        }
+
+        return projectName.EndsWith("Tests", StringComparison.OrdinalIgnoreCase)
+            || projectName.EndsWith("Test", StringComparison.OrdinalIgnoreCase)
+            || projectName.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
+            || projectName.EndsWith(".Test", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
