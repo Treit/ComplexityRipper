@@ -34,7 +34,6 @@ public class HtmlReportGenerator
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
         AppendSummaryCards(sb, data, totalLong, totalComplex, totalCombined);
         AppendRepoRanking(sb, repoStats);
-        AppendDistributionCharts(sb, data, thresholdLines, thresholdComplexity);
         AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
         sb.AppendLine("</body>");
@@ -56,6 +55,7 @@ public class HtmlReportGenerator
         int MaxComplexity,
         int MaxLines,
         int ConcernScore,
+        List<FunctionMetrics> All,
         List<FunctionMetrics> Long,
         List<FunctionMetrics> Complex,
         List<FunctionMetrics> Combined);
@@ -109,6 +109,7 @@ public class HtmlReportGenerator
             MaxComplexity: functions.Count > 0 ? functions.Max(f => f.CyclomaticComplexity) : 0,
             MaxLines: functions.Count > 0 ? functions.Max(f => f.LineCount) : 0,
             ConcernScore: score,
+            All: functions,
             Long: longFuncs,
             Complex: complexFuncs,
             Combined: combinedFuncs);
@@ -318,44 +319,41 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</tbody></table>");
     }
 
-    private void AppendDistributionCharts(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity)
+    private void AppendDistributionCharts(StringBuilder sb, List<FunctionMetrics> functions)
     {
-        sb.AppendLine("<h2>Distribution</h2>");
         sb.AppendLine("<div class=\"chart-container\">");
         sb.AppendLine("<div class=\"chart-grid\">");
 
-        // Function length distribution
         var lengthBuckets = new (string label, int min, int max, string color)[]
         {
-            ("0–50", 0, 50, "var(--bar-1)"),
-            ("51–100", 51, 100, "var(--bar-2)"),
-            ("101–200", 101, 200, "var(--bar-3)"),
-            ("201–500", 201, 500, "var(--bar-4)"),
+            ("0-50", 0, 50, "var(--bar-1)"),
+            ("51-100", 51, 100, "var(--bar-2)"),
+            ("101-200", 101, 200, "var(--bar-3)"),
+            ("201-500", 201, 500, "var(--bar-4)"),
             ("500+", 501, int.MaxValue, "var(--bar-5)"),
         };
 
         sb.AppendLine("<div>");
         sb.AppendLine("<h3>Function Length (lines)</h3>");
-        AppendBarChart(sb, data.Functions, f => f.LineCount, lengthBuckets);
+        AppendBarChart(sb, functions, f => f.LineCount, lengthBuckets);
         sb.AppendLine("</div>");
 
-        // Complexity distribution
         var complexityBuckets = new (string label, int min, int max, string color)[]
         {
-            ("1–5", 1, 5, "var(--bar-1)"),
-            ("6–10", 6, 10, "var(--bar-2)"),
-            ("11–15", 11, 15, "var(--bar-3)"),
-            ("16–25", 16, 25, "var(--bar-4)"),
-            ("25+", 26, int.MaxValue, "var(--bar-5)"),
+            ("1-5", 1, 5, "var(--bar-1)"),
+            ("6-10", 6, 10, "var(--bar-2)"),
+            ("11-25", 11, 25, "var(--bar-3)"),
+            ("26-50", 26, 50, "var(--bar-4)"),
+            ("50+", 51, int.MaxValue, "var(--bar-5)"),
         };
 
         sb.AppendLine("<div>");
         sb.AppendLine("<h3>Cyclomatic Complexity</h3>");
-        AppendBarChart(sb, data.Functions, f => f.CyclomaticComplexity, complexityBuckets);
+        AppendBarChart(sb, functions, f => f.CyclomaticComplexity, complexityBuckets);
         sb.AppendLine("</div>");
 
-        sb.AppendLine("</div>"); // chart-grid
-        sb.AppendLine("</div>"); // chart-container
+        sb.AppendLine("</div>");
+        sb.AppendLine("</div>");
     }
 
     private void AppendBarChart(StringBuilder sb, List<FunctionMetrics> functions, Func<FunctionMetrics, int> valueSelector, (string label, int min, int max, string color)[] buckets)
@@ -476,6 +474,8 @@ tr:hover { background: var(--bg-tertiary); }
                           $"Combined: {repo.CombinedCount} &nbsp;|&nbsp; Long: {repo.LongCount} &nbsp;|&nbsp; Complex: {repo.ComplexCount}</p>");
 
             var tablePrefix = $"repo-{anchor}";
+
+            AppendDistributionCharts(sb, repo.All);
 
             if (repo.Combined.Count > 0)
             {
