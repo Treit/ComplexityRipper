@@ -11,7 +11,7 @@ namespace ComplexityRipper.Report;
 /// </summary>
 public class HtmlReportGenerator
 {
-    public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 15)
+    public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 15, string theme = "dark")
     {
         var sb = new StringBuilder();
 
@@ -36,7 +36,7 @@ public class HtmlReportGenerator
 
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html lang=\"en\">");
-        AppendHead(sb);
+        AppendHead(sb, theme);
         sb.AppendLine("<body>");
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
         AppendSummaryCards(sb, data, longFunctions.Count, complexFunctions.Count, combinedRisk.Count);
@@ -53,34 +53,128 @@ public class HtmlReportGenerator
         File.WriteAllText(outputPath, sb.ToString());
     }
 
-    private void AppendHead(StringBuilder sb)
+    private void AppendHead(StringBuilder sb, string defaultTheme)
     {
         sb.AppendLine("<head>");
         sb.AppendLine("<meta charset=\"UTF-8\">");
         sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
         sb.AppendLine("<title>Code Complexity Report</title>");
         sb.AppendLine("<style>");
-        sb.AppendLine(GetCss());
+        sb.AppendLine(GetThemeCss());
+        sb.AppendLine(GetLayoutCss());
         sb.AppendLine("</style>");
+        sb.AppendLine($"<script>document.documentElement.setAttribute('data-theme', '{defaultTheme}');</script>");
         sb.AppendLine("</head>");
     }
 
-    private string GetCss() => @"
-:root {
+    private static string GetThemeCss() => @"
+/* ── Dark ── */
+[data-theme=""dark""] {
     --bg: #0d1117;
     --bg-secondary: #161b22;
     --bg-tertiary: #1c2128;
     --border: #30363d;
     --text: #e6edf3;
     --text-muted: #8b949e;
-    --green: #3fb950;
-    --yellow: #d29922;
-    --orange: #db6d28;
-    --red: #f85149;
-    --blue: #58a6ff;
-    --purple: #bc8cff;
+    --link: #58a6ff;
+    --severity-ok: #3fb950;
+    --severity-medium: #d29922;
+    --severity-high: #db6d28;
+    --severity-critical: #f85149;
+    --info: #58a6ff;
+    --bar-1: #3fb950;
+    --bar-2: #3fb950;
+    --bar-3: #d29922;
+    --bar-4: #db6d28;
+    --bar-5: #f85149;
 }
 
+/* ── Light ── */
+[data-theme=""light""] {
+    --bg: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #eaeef2;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --text-muted: #656d76;
+    --link: #0969da;
+    --severity-ok: #1a7f37;
+    --severity-medium: #9a6700;
+    --severity-high: #bc4c00;
+    --severity-critical: #cf222e;
+    --info: #0969da;
+    --bar-1: #1a7f37;
+    --bar-2: #1a7f37;
+    --bar-3: #9a6700;
+    --bar-4: #bc4c00;
+    --bar-5: #cf222e;
+}
+
+/* ── Colorblind-safe (blue / orange / purple palette, no red-green) ── */
+[data-theme=""colorblind""] {
+    --bg: #fafbfc;
+    --bg-secondary: #f0f2f5;
+    --bg-tertiary: #e4e7eb;
+    --border: #c9cdd3;
+    --text: #24292f;
+    --text-muted: #57606a;
+    --link: #0550ae;
+    --severity-ok: #0550ae;
+    --severity-medium: #e16f24;
+    --severity-high: #c93c00;
+    --severity-critical: #8b1a00;
+    --info: #0550ae;
+    --bar-1: #0550ae;
+    --bar-2: #2c7bb6;
+    --bar-3: #e16f24;
+    --bar-4: #c93c00;
+    --bar-5: #8b1a00;
+}
+
+/* ── High-contrast dark ── */
+[data-theme=""high-contrast""] {
+    --bg: #000000;
+    --bg-secondary: #0a0a0a;
+    --bg-tertiary: #151515;
+    --border: #444444;
+    --text: #ffffff;
+    --text-muted: #b0b0b0;
+    --link: #71b7ff;
+    --severity-ok: #56d364;
+    --severity-medium: #f0c000;
+    --severity-high: #ff9e3a;
+    --severity-critical: #ff6a69;
+    --info: #71b7ff;
+    --bar-1: #56d364;
+    --bar-2: #56d364;
+    --bar-3: #f0c000;
+    --bar-4: #ff9e3a;
+    --bar-5: #ff6a69;
+}
+
+/* ── Ink (print-friendly, minimal color) ── */
+[data-theme=""ink""] {
+    --bg: #ffffff;
+    --bg-secondary: #fafafa;
+    --bg-tertiary: #f0f0f0;
+    --border: #cccccc;
+    --text: #111111;
+    --text-muted: #666666;
+    --link: #1a5276;
+    --severity-ok: #444444;
+    --severity-medium: #7d5a00;
+    --severity-high: #9e3500;
+    --severity-critical: #8b0000;
+    --info: #1a5276;
+    --bar-1: #a0a0a0;
+    --bar-2: #888888;
+    --bar-3: #7d5a00;
+    --bar-4: #9e3500;
+    --bar-5: #8b0000;
+}
+";
+
+    private static string GetLayoutCss() => @"
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; }
 .container { max-width: 1400px; margin: 0 auto; }
@@ -88,23 +182,28 @@ h1 { font-size: 28px; margin-bottom: 8px; }
 h2 { font-size: 22px; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 h3 { font-size: 18px; margin: 16px 0 8px 0; }
 .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
-a { color: var(--blue); text-decoration: none; }
+a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Theme switcher */
+.theme-switcher { display: inline-flex; align-items: center; gap: 6px; float: right; margin-top: 4px; }
+.theme-switcher label { font-size: 12px; color: var(--text-muted); }
+.theme-switcher select { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 12px; cursor: pointer; }
 
 /* Summary cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
 .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
 .card .value { font-size: 32px; font-weight: 700; }
 .card .label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-.card.ok .value { color: var(--green); }
-.card.warn .value { color: var(--yellow); }
-.card.danger .value { color: var(--red); }
-.card.critical .value { color: var(--red); font-weight: 900; }
-.card.info .value { color: var(--blue); }
+.card.ok .value { color: var(--severity-ok); }
+.card.warn .value { color: var(--severity-medium); }
+.card.danger .value { color: var(--severity-critical); }
+.card.critical .value { color: var(--severity-critical); font-weight: 900; }
+.card.info .value { color: var(--info); }
 
 /* Tables */
 .table-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
-.table-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.table-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
 .table-header h3 { margin: 0; }
 .table-filter { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 6px 10px; font-size: 13px; width: 250px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -115,10 +214,10 @@ th .sort-arrow { margin-left: 4px; font-size: 10px; color: var(--text-muted); }
 td { padding: 8px 12px; border-top: 1px solid var(--border); }
 tr:hover { background: var(--bg-tertiary); }
 .numeric { text-align: right; font-variant-numeric: tabular-nums; }
-.severity-critical { color: var(--red); font-weight: 700; }
-.severity-high { color: var(--orange); font-weight: 600; }
-.severity-medium { color: var(--yellow); }
-.severity-ok { color: var(--green); }
+.severity-critical { color: var(--severity-critical); font-weight: 700; }
+.severity-high { color: var(--severity-high); font-weight: 600; }
+.severity-medium { color: var(--severity-medium); }
+.severity-ok { color: var(--severity-ok); }
 .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; }
 .truncate { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .count-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); margin-left: 8px; }
@@ -149,7 +248,17 @@ tr:hover { background: var(--bg-tertiary); }
     private void AppendHeader(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity)
     {
         sb.AppendLine("<div class=\"container\">");
-        sb.AppendLine("<h1>📊 Code Complexity Report</h1>");
+        sb.AppendLine("<div class=\"theme-switcher\">");
+        sb.AppendLine("  <label>Theme:</label>");
+        sb.AppendLine("  <select onchange=\"setTheme(this.value)\" id=\"theme-select\">");
+        sb.AppendLine("    <option value=\"dark\">Dark</option>");
+        sb.AppendLine("    <option value=\"light\">Light</option>");
+        sb.AppendLine("    <option value=\"colorblind\">Colorblind-safe</option>");
+        sb.AppendLine("    <option value=\"high-contrast\">High contrast</option>");
+        sb.AppendLine("    <option value=\"ink\">Ink (print)</option>");
+        sb.AppendLine("  </select>");
+        sb.AppendLine("</div>");
+        sb.AppendLine("<h1>Code Complexity Report</h1>");
         sb.AppendLine($"<p class=\"subtitle\">Generated {data.Metadata.GeneratedAt:yyyy-MM-dd HH:mm:ss UTC} &nbsp;|&nbsp; " +
                        $"Thresholds: {thresholdLines} lines, {thresholdComplexity} complexity &nbsp;|&nbsp; " +
                        $"Root: {Encode(data.Metadata.RootPath)}</p>");
@@ -208,11 +317,11 @@ tr:hover { background: var(--bg-tertiary); }
         // Function length distribution
         var lengthBuckets = new (string label, int min, int max, string color)[]
         {
-            ("0–50", 0, 50, "var(--green)"),
-            ("51–100", 51, 100, "var(--green)"),
-            ("101–200", 101, 200, "var(--yellow)"),
-            ("201–500", 201, 500, "var(--orange)"),
-            ("500+", 501, int.MaxValue, "var(--red)"),
+            ("0–50", 0, 50, "var(--bar-1)"),
+            ("51–100", 51, 100, "var(--bar-2)"),
+            ("101–200", 101, 200, "var(--bar-3)"),
+            ("201–500", 201, 500, "var(--bar-4)"),
+            ("500+", 501, int.MaxValue, "var(--bar-5)"),
         };
 
         sb.AppendLine("<div>");
@@ -223,11 +332,11 @@ tr:hover { background: var(--bg-tertiary); }
         // Complexity distribution
         var complexityBuckets = new (string label, int min, int max, string color)[]
         {
-            ("1–5", 1, 5, "var(--green)"),
-            ("6–10", 6, 10, "var(--green)"),
-            ("11–15", 11, 15, "var(--yellow)"),
-            ("16–25", 16, 25, "var(--orange)"),
-            ("25+", 26, int.MaxValue, "var(--red)"),
+            ("1–5", 1, 5, "var(--bar-1)"),
+            ("6–10", 6, 10, "var(--bar-2)"),
+            ("11–15", 11, 15, "var(--bar-3)"),
+            ("16–25", 16, 25, "var(--bar-4)"),
+            ("25+", 26, int.MaxValue, "var(--bar-5)"),
         };
 
         sb.AppendLine("<div>");
@@ -271,7 +380,7 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine($"<h2>⚠️ Combined Risk — Long AND Complex <span class=\"count-badge\">{functions.Count}</span></h2>");
         if (functions.Count == 0)
         {
-            sb.AppendLine("<p style=\"color: var(--green);\">No functions exceed both thresholds. 🎉</p>");
+            sb.AppendLine("<p style=\"color: var(--severity-ok);\">No functions exceed both thresholds.</p>");
             return;
         }
         AppendFunctionTable(sb, null, "Functions exceeding BOTH line count and complexity thresholds — highest refactoring priority", functions, repoLookup, "combined-risk");
@@ -444,7 +553,7 @@ tr:hover { background: var(--bg-tertiary); }
     private void AppendFooter(StringBuilder sb)
     {
         sb.AppendLine("<div style=\"text-align: center; margin-top: 40px; padding: 20px; color: var(--text-muted); font-size: 12px;\">");
-        sb.AppendLine("  Generated by CodeAnalyzer — Roslyn + Lizard hybrid analysis");
+        sb.AppendLine("  Generated by ComplexityRipper");
         sb.AppendLine("</div>");
         sb.AppendLine("</div>"); // container
 
@@ -455,6 +564,18 @@ tr:hover { background: var(--bg-tertiary); }
     }
 
     private string GetJavaScript() => @"
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    var sel = document.getElementById('theme-select');
+    if (sel) sel.value = theme;
+}
+
+(function() {
+    var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    var sel = document.getElementById('theme-select');
+    if (sel) sel.value = theme;
+})();
+
 const sortState = {};
 
 function sortTable(tableId, colIndex, type) {

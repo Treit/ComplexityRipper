@@ -80,12 +80,14 @@ var inputOption = new Option<string>("--input", () => "stats.json", "Input JSON 
 var reportOutputOption = new Option<string>("--output", () => "code-complexity-report.html", "Output HTML file path");
 var thresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var thresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
+var themeOption = new Option<string>("--theme", () => "dark", "Report theme: dark, light, colorblind, high-contrast, ink");
 reportCommand.AddOption(inputOption);
 reportCommand.AddOption(reportOutputOption);
 reportCommand.AddOption(thresholdLinesOption);
 reportCommand.AddOption(thresholdComplexityOption);
+reportCommand.AddOption(themeOption);
 
-reportCommand.SetHandler(async (string input, string output, int thresholdLines, int thresholdComplexity) =>
+reportCommand.SetHandler(async (string input, string output, int thresholdLines, int thresholdComplexity, string theme) =>
 {
     if (!File.Exists(input))
     {
@@ -105,10 +107,10 @@ reportCommand.SetHandler(async (string input, string output, int thresholdLines,
     }
 
     var reportGenerator = new HtmlReportGenerator();
-    reportGenerator.Generate(data, output, thresholdLines, thresholdComplexity);
+    reportGenerator.Generate(data, output, thresholdLines, thresholdComplexity, theme);
     Console.WriteLine($"Report written to: {output}");
 
-}, inputOption, reportOutputOption, thresholdLinesOption, thresholdComplexityOption);
+}, inputOption, reportOutputOption, thresholdLinesOption, thresholdComplexityOption, themeOption);
 
 // run command — analyze + report in one step
 var runCommand = new Command("run", "Analyze repos and generate report in one step");
@@ -118,14 +120,16 @@ var runStatsOption = new Option<string>("--stats", () => "stats.json", "Intermed
 var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
 var runCsharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
+var runThemeOption = new Option<string>("--theme", () => "dark", "Report theme: dark, light, colorblind, high-contrast, ink");
 runCommand.AddOption(runRootOption);
 runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
 runCommand.AddOption(runThresholdLinesOption);
 runCommand.AddOption(runThresholdComplexityOption);
 runCommand.AddOption(runCsharpOnlyOption);
+runCommand.AddOption(runThemeOption);
 
-runCommand.SetHandler(async (string root, string output, string statsPath, int thresholdLines, int thresholdComplexity, bool csharpOnly) =>
+runCommand.SetHandler(async (string root, string output, string statsPath, int thresholdLines, int thresholdComplexity, bool csharpOnly, string theme) =>
 {
     if (!Directory.Exists(root))
     {
@@ -176,13 +180,13 @@ runCommand.SetHandler(async (string root, string output, string statsPath, int t
 
     // Generate HTML report
     var reportGenerator = new HtmlReportGenerator();
-    reportGenerator.Generate(result, output, thresholdLines, thresholdComplexity);
+    reportGenerator.Generate(result, output, thresholdLines, thresholdComplexity, theme);
     Console.WriteLine($"Report written to: {output}");
 
     sw.Stop();
     Console.WriteLine($"Completed in {sw.Elapsed.TotalSeconds:F1}s");
 
-}, runRootOption, runOutputOption, runStatsOption, runThresholdLinesOption, runThresholdComplexityOption, runCsharpOnlyOption);
+}, runRootOption, runOutputOption, runStatsOption, runThresholdLinesOption, runThresholdComplexityOption, runCsharpOnlyOption, runThemeOption);
 
 rootCommand.AddCommand(analyzeCommand);
 rootCommand.AddCommand(reportCommand);
