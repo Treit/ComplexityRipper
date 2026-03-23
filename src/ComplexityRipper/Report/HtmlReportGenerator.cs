@@ -40,12 +40,12 @@ public class HtmlReportGenerator
         sb.AppendLine("<body>");
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
         AppendSummaryCards(sb, data, longFunctions.Count, complexFunctions.Count, combinedRisk.Count);
+        AppendRepoBreakdown(sb, data, thresholdLines, thresholdComplexity);
         AppendLanguageBreakdown(sb, data);
         AppendDistributionCharts(sb, data, thresholdLines, thresholdComplexity);
         AppendCombinedRiskTable(sb, combinedRisk, repoLookup);
         AppendFunctionTable(sb, "Long Functions", $"Functions with {thresholdLines}+ lines", longFunctions, repoLookup, "long-functions");
         AppendFunctionTable(sb, "High Complexity Functions", $"Functions with cyclomatic complexity ≥ {thresholdComplexity}", complexFunctions, repoLookup, "complex-functions");
-        AppendRepoBreakdown(sb, data, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
