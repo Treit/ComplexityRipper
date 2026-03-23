@@ -200,6 +200,8 @@ tr:hover { background: var(--bg-tertiary); }
 .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 12px; }
 .truncate { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .count-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+.repo-separator td { background: var(--bg-tertiary); border-top: 2px solid var(--border); }
+.repo-heading { font-weight: 700; font-size: 14px; padding: 10px 12px; }
 
 /* Charts */
 .chart-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
@@ -380,7 +382,7 @@ tr:hover { background: var(--bg-tertiary); }
         var repos = functions.Select(f => f.Repo).Where(r => !string.IsNullOrEmpty(r)).Distinct().OrderBy(r => r).ToList();
         if (repos.Count > 1)
         {
-            sb.AppendLine($"    <select class=\"table-filter\" onchange=\"filterByRepo('{tableId}', this.value, 0)\">");
+            sb.AppendLine($"    <select class=\"table-filter\" onchange=\"filterByRepoGroup('{tableId}', this.value)\">");
             sb.AppendLine("      <option value=\"\">All repos</option>");
             foreach (var repo in repos)
             {
@@ -395,72 +397,76 @@ tr:hover { background: var(--bg-tertiary); }
 
         sb.AppendLine($"<table id=\"{tableId}\">");
         sb.AppendLine("<thead><tr>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 0, 'string')\">Repo <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 1, 'string')\">Project <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 2, 'string')\">File <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 3, 'string')\">Class <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 4, 'string')\">Function <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 5, 'number')\" class=\"numeric\">Lines <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 6, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 7, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 8, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 9, 'string')\">Language <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 0, 'string')\">Project <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 1, 'string')\">File <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 2, 'string')\">Class <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 3, 'string')\">Function <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 4, 'number')\" class=\"numeric\">Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 5, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 6, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 7, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 8, 'string')\">Language <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("</tr></thead>");
         sb.AppendLine("<tbody>");
 
-        foreach (var f in functions)
+        var grouped = functions.GroupBy(f => f.Repo).OrderBy(g => g.Key);
+        foreach (var repoGroup in grouped)
         {
-            repoLookup.TryGetValue(f.Repo, out var repoInfo);
+            repoLookup.TryGetValue(repoGroup.Key, out var repoInfo);
             var baseUrl = repoInfo?.AdoBaseUrl;
             var branch = repoInfo?.DefaultBranch ?? "main";
 
-            // Repo column: link to repo root
-            string repoCell = Encode(f.Repo);
+            string repoLabel = Encode(repoGroup.Key);
             if (baseUrl != null)
             {
-                repoCell = $"<a href=\"{Encode(baseUrl)}\" target=\"_blank\">{Encode(f.Repo)}</a>";
+                repoLabel = $"<a href=\"{Encode(baseUrl)}\" target=\"_blank\">{Encode(repoGroup.Key)}</a>";
             }
-
-            // File column: link to file at line range
-            string fileCell = Encode(f.File);
-            if (baseUrl != null)
-            {
-                var fileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
-                fileCell = $"<a href=\"{Encode(fileUrl)}\" target=\"_blank\" title=\"{Encode(f.File)}\">{Encode(GetShortFileName(f.File))}</a>";
-            }
-
-            // Class column: link to file (so reader can find the class)
-            string classCell = Encode(f.ClassName ?? "");
-            if (baseUrl != null && f.ClassName != null)
-            {
-                var classFileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, branch);
-                classCell = $"<a href=\"{Encode(classFileUrl)}\" target=\"_blank\">{Encode(f.ClassName)}</a>";
-            }
-
-            // Function column: link to file at exact start line
-            string funcCell = Encode(f.Function);
-            if (baseUrl != null)
-            {
-                var funcUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
-                funcCell = $"<a href=\"{Encode(funcUrl)}\" target=\"_blank\">{Encode(f.Function)}</a>";
-            }
-
-            var lineSeverity = GetSeverityClass(f.LineCount, 500, 300, 200);
-            var complexitySeverity = GetSeverityClass(f.CyclomaticComplexity, 30, 20, 15);
-            var nestingSeverity = GetSeverityClass(f.MaxNestingDepth, 7, 5, 3);
-
-            sb.AppendLine("<tr>");
-            sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
-            sb.AppendLine($"  <td class=\"mono\">{Encode(f.Project ?? "")}</td>");
-            sb.AppendLine($"  <td class=\"mono truncate\">{fileCell}</td>");
-            sb.AppendLine($"  <td class=\"mono truncate\">{classCell}</td>");
-            sb.AppendLine($"  <td class=\"mono\">{funcCell}</td>");
-            sb.AppendLine($"  <td class=\"numeric {lineSeverity}\" data-v=\"{f.LineCount}\">{f.LineCount}</td>");
-            sb.AppendLine($"  <td class=\"numeric {complexitySeverity}\" data-v=\"{f.CyclomaticComplexity}\">{f.CyclomaticComplexity}</td>");
-            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{f.ParameterCount}\">{f.ParameterCount}</td>");
-            sb.AppendLine($"  <td class=\"numeric {nestingSeverity}\" data-v=\"{f.MaxNestingDepth}\">{f.MaxNestingDepth}</td>");
-            sb.AppendLine($"  <td>{Encode(f.Language)}</td>");
+            sb.AppendLine($"<tr class=\"repo-separator\" data-repo=\"{Encode(repoGroup.Key)}\">");
+            sb.AppendLine($"  <td colspan=\"9\" class=\"repo-heading\">{repoLabel} <span class=\"count-badge\">{repoGroup.Count()}</span></td>");
             sb.AppendLine("</tr>");
+
+            foreach (var f in repoGroup)
+            {
+                // File column: link to file at line range
+                string fileCell = Encode(f.File);
+                if (baseUrl != null)
+                {
+                    var fileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
+                    fileCell = $"<a href=\"{Encode(fileUrl)}\" target=\"_blank\" title=\"{Encode(f.File)}\">{Encode(GetShortFileName(f.File))}</a>";
+                }
+
+                // Class column: link to file
+                string classCell = Encode(f.ClassName ?? "");
+                if (baseUrl != null && f.ClassName != null)
+                {
+                    var classFileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, branch);
+                    classCell = $"<a href=\"{Encode(classFileUrl)}\" target=\"_blank\">{Encode(f.ClassName)}</a>";
+                }
+
+                // Function column: link to file at exact start line
+                string funcCell = Encode(f.Function);
+                if (baseUrl != null)
+                {
+                    var funcUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
+                    funcCell = $"<a href=\"{Encode(funcUrl)}\" target=\"_blank\">{Encode(f.Function)}</a>";
+                }
+
+                var lineSeverity = GetSeverityClass(f.LineCount, 500, 300, 200);
+                var complexitySeverity = GetSeverityClass(f.CyclomaticComplexity, 30, 20, 15);
+                var nestingSeverity = GetSeverityClass(f.MaxNestingDepth, 7, 5, 3);
+
+                sb.AppendLine($"<tr data-repo=\"{Encode(f.Repo)}\">");
+                sb.AppendLine($"  <td class=\"mono\">{Encode(f.Project ?? "")}</td>");
+                sb.AppendLine($"  <td class=\"mono truncate\">{fileCell}</td>");
+                sb.AppendLine($"  <td class=\"mono truncate\">{classCell}</td>");
+                sb.AppendLine($"  <td class=\"mono\">{funcCell}</td>");
+                sb.AppendLine($"  <td class=\"numeric {lineSeverity}\" data-v=\"{f.LineCount}\">{f.LineCount}</td>");
+                sb.AppendLine($"  <td class=\"numeric {complexitySeverity}\" data-v=\"{f.CyclomaticComplexity}\">{f.CyclomaticComplexity}</td>");
+                sb.AppendLine($"  <td class=\"numeric\" data-v=\"{f.ParameterCount}\">{f.ParameterCount}</td>");
+                sb.AppendLine($"  <td class=\"numeric {nestingSeverity}\" data-v=\"{f.MaxNestingDepth}\">{f.MaxNestingDepth}</td>");
+                sb.AppendLine($"  <td>{Encode(f.Language)}</td>");
+                sb.AppendLine("</tr>");
+            }
         }
 
         sb.AppendLine("</tbody>");
@@ -597,34 +603,28 @@ function filterTable(tableId, query) {
     const table = document.getElementById(tableId);
     const rows = table.querySelectorAll('tbody tr');
     const q = query.toLowerCase();
-    const repoFilter = (tableFilters[tableId] || '').toLowerCase();
+    const repoFilter = (tableFilters[tableId] || '');
 
     rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        const repoText = (row.cells[0]?.textContent || '').toLowerCase();
-        const matchesText = !q || text.includes(q);
-        const matchesRepo = !repoFilter || repoText === repoFilter;
-        row.style.display = (matchesText && matchesRepo) ? '' : 'none';
+        if (row.classList.contains('repo-separator')) {
+            var repo = row.getAttribute('data-repo') || '';
+            row.style.display = (!repoFilter || repo === repoFilter) ? '' : 'none';
+            return;
+        }
+        var rowRepo = row.getAttribute('data-repo') || '';
+        var text = row.textContent.toLowerCase();
+        var matchesRepo = !repoFilter || rowRepo === repoFilter;
+        var matchesText = !q || text.includes(q);
+        row.style.display = (matchesRepo && matchesText) ? '' : 'none';
     });
 }
 
 const tableFilters = {};
 
-function filterByRepo(tableId, repo, colIndex) {
+function filterByRepoGroup(tableId, repo) {
     tableFilters[tableId] = repo;
-    const table = document.getElementById(tableId);
-    const rows = table.querySelectorAll('tbody tr');
-    const r = repo.toLowerCase();
-    const textInput = table.closest('.table-container')?.querySelector('input.table-filter');
-    const q = (textInput?.value || '').toLowerCase();
-
-    rows.forEach(row => {
-        const repoText = (row.cells[colIndex]?.textContent || '').toLowerCase();
-        const text = row.textContent.toLowerCase();
-        const matchesRepo = !r || repoText === r;
-        const matchesText = !q || text.includes(q);
-        row.style.display = (matchesRepo && matchesText) ? '' : 'none';
-    });
+    var textInput = document.getElementById(tableId)?.closest('.table-container')?.querySelector('input.table-filter');
+    filterTable(tableId, textInput?.value || '');
 }
 ";
 
