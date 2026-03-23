@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ComplexityRipper.Analysis;
 using ComplexityRipper.Models;
 using ComplexityRipper.Report;
@@ -19,11 +21,15 @@ var analyzeCommand = new Command("analyze", "Scan repositories and generate anal
 var rootPathOption = new Option<string>("--root", "Root directory containing repos to analyze") { IsRequired = true };
 var outputOption = new Option<string>("--output", () => "stats.json", "Output JSON file path");
 var csharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
+var includeOption = new Option<string?>("--include", "Regex to include file paths (use | for OR). Only matching paths are analyzed");
+var excludeOption = new Option<string?>("--exclude", "Regex to exclude file paths (use | for OR). Matching paths are skipped");
 analyzeCommand.AddOption(rootPathOption);
 analyzeCommand.AddOption(outputOption);
 analyzeCommand.AddOption(csharpOnlyOption);
+analyzeCommand.AddOption(includeOption);
+analyzeCommand.AddOption(excludeOption);
 
-analyzeCommand.SetHandler(async (string root, string output, bool csharpOnly) =>
+analyzeCommand.SetHandler(async (string root, string output, bool csharpOnly, string? include, string? exclude) =>
 {
     if (!Directory.Exists(root))
     {
@@ -31,24 +37,34 @@ analyzeCommand.SetHandler(async (string root, string output, bool csharpOnly) =>
         return;
     }
 
+    var includeFilter = include != null ? new Regex(include, RegexOptions.IgnoreCase | RegexOptions.Compiled) : null;
+    var excludeFilter = exclude != null ? new Regex(exclude, RegexOptions.IgnoreCase | RegexOptions.Compiled) : null;
+
     Console.WriteLine($"Analyzing repos in: {root}");
+    if (includeFilter != null)
+    {
+        Console.WriteLine($"  Include filter: {include}");
+    }
+
+    if (excludeFilter != null)
+    {
+        Console.WriteLine($"  Exclude filter: {exclude}");
+    }
+
     Console.WriteLine();
 
-    // Phase 1: Roslyn C# analysis
     var csharpAnalyzer = new CSharpAnalyzer();
-    var result = csharpAnalyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  [C#] {msg}"));
+    var result = csharpAnalyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  [C#] {msg}"), includeFilter, excludeFilter);
 
     Console.WriteLine($"  [C#] Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
 
-    // Phase 2: Lizard for other languages
     if (!csharpOnly)
     {
         var lizardRunner = new LizardRunner();
-        var otherFunctions = lizardRunner.Analyze(root, result.Repos, msg => Console.WriteLine($"  [Lizard] {msg}"));
+        var otherFunctions = lizardRunner.Analyze(root, result.Repos, msg => Console.WriteLine($"  [Lizard] {msg}"), includeFilter, excludeFilter);
 
         result.Functions.AddRange(otherFunctions);
 
-        // Update summary with Lizard results
         var langGroups = otherFunctions.GroupBy(f => f.Language);
         foreach (var group in langGroups)
         {
@@ -67,12 +83,11 @@ analyzeCommand.SetHandler(async (string root, string output, bool csharpOnly) =>
     Console.WriteLine();
     Console.WriteLine($"Total: {result.Functions.Count:N0} functions analyzed");
 
-    // Write JSON output
     var json = JsonSerializer.Serialize(result, jsonOptions);
     await File.WriteAllTextAsync(output, json);
     Console.WriteLine($"Stats written to: {output}");
 
-}, rootPathOption, outputOption, csharpOnlyOption);
+}, rootPathOption, outputOption, csharpOnlyOption, includeOption, excludeOption);
 
 // report command — reads JSON and generates HTML
 var reportCommand = new Command("report", "Generate HTML report from analysis JSON");
@@ -121,6 +136,8 @@ var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "L
 var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
 var runCsharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
 var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
+var runIncludeOption = new Option<string?>("--include", "Regex to include file paths (use | for OR). Only matching paths are analyzed");
+var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude file paths (use | for OR). Matching paths are skipped");
 runCommand.AddOption(runRootOption);
 runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
@@ -128,30 +145,52 @@ runCommand.AddOption(runThresholdLinesOption);
 runCommand.AddOption(runThresholdComplexityOption);
 runCommand.AddOption(runCsharpOnlyOption);
 runCommand.AddOption(runThemeOption);
+runCommand.AddOption(runIncludeOption);
+runCommand.AddOption(runExcludeOption);
 
-runCommand.SetHandler(async (string root, string output, string statsPath, int thresholdLines, int thresholdComplexity, bool csharpOnly, string theme) =>
+runCommand.SetHandler(async (InvocationContext ctx) =>
 {
+    var root = ctx.ParseResult.GetValueForOption(runRootOption)!;
+    var output = ctx.ParseResult.GetValueForOption(runOutputOption)!;
+    var statsPath = ctx.ParseResult.GetValueForOption(runStatsOption)!;
+    var thresholdLines = ctx.ParseResult.GetValueForOption(runThresholdLinesOption);
+    var thresholdComplexity = ctx.ParseResult.GetValueForOption(runThresholdComplexityOption);
+    var csharpOnly = ctx.ParseResult.GetValueForOption(runCsharpOnlyOption);
+    var theme = ctx.ParseResult.GetValueForOption(runThemeOption)!;
+    var include = ctx.ParseResult.GetValueForOption(runIncludeOption);
+    var exclude = ctx.ParseResult.GetValueForOption(runExcludeOption);
     if (!Directory.Exists(root))
     {
         Console.Error.WriteLine($"Error: Directory not found: {root}");
         return;
     }
 
+    var includeFilter = include != null ? new Regex(include, RegexOptions.IgnoreCase | RegexOptions.Compiled) : null;
+    var excludeFilter = exclude != null ? new Regex(exclude, RegexOptions.IgnoreCase | RegexOptions.Compiled) : null;
+
     var sw = System.Diagnostics.Stopwatch.StartNew();
     Console.WriteLine($"Analyzing repos in: {root}");
+    if (includeFilter != null)
+    {
+        Console.WriteLine($"  Include filter: {include}");
+    }
+
+    if (excludeFilter != null)
+    {
+        Console.WriteLine($"  Exclude filter: {exclude}");
+    }
+
     Console.WriteLine();
 
-    // Phase 1: Roslyn C# analysis
     var csharpAnalyzer = new CSharpAnalyzer();
-    var result = csharpAnalyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  [C#] {msg}"));
+    var result = csharpAnalyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  [C#] {msg}"), includeFilter, excludeFilter);
 
     Console.WriteLine($"  [C#] Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
 
-    // Phase 2: Lizard for other languages
     if (!csharpOnly)
     {
         var lizardRunner = new LizardRunner();
-        var otherFunctions = lizardRunner.Analyze(root, result.Repos, msg => Console.WriteLine($"  [Lizard] {msg}"));
+        var otherFunctions = lizardRunner.Analyze(root, result.Repos, msg => Console.WriteLine($"  [Lizard] {msg}"), includeFilter, excludeFilter);
 
         result.Functions.AddRange(otherFunctions);
 
@@ -173,12 +212,10 @@ runCommand.SetHandler(async (string root, string output, string statsPath, int t
     Console.WriteLine();
     Console.WriteLine($"Total: {result.Functions.Count:N0} functions analyzed");
 
-    // Save stats JSON
     var json = JsonSerializer.Serialize(result, jsonOptions);
     await File.WriteAllTextAsync(statsPath, json);
     Console.WriteLine($"Stats written to: {statsPath}");
 
-    // Generate HTML report
     var reportGenerator = new HtmlReportGenerator();
     reportGenerator.Generate(result, output, thresholdLines, thresholdComplexity, theme);
     Console.WriteLine($"Report written to: {output}");
@@ -186,7 +223,7 @@ runCommand.SetHandler(async (string root, string output, string statsPath, int t
     sw.Stop();
     Console.WriteLine($"Completed in {sw.Elapsed.TotalSeconds:F1}s");
 
-}, runRootOption, runOutputOption, runStatsOption, runThresholdLinesOption, runThresholdComplexityOption, runCsharpOnlyOption, runThemeOption);
+});
 
 rootCommand.AddCommand(analyzeCommand);
 rootCommand.AddCommand(reportCommand);

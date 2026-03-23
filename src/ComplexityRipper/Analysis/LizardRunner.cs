@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using ComplexityRipper.Models;
 
 namespace ComplexityRipper.Analysis;
@@ -20,7 +21,7 @@ public class LizardRunner
     /// Runs Lizard against the root path for non-C# languages, returning function metrics.
     /// Excludes .cs files (handled by Roslyn) and .rs files (Lizard can't parse Rust functions).
     /// </summary>
-    public List<FunctionMetrics> Analyze(string rootPath, List<RepoInfo> repos, Action<string>? onProgress = null)
+    public List<FunctionMetrics> Analyze(string rootPath, List<RepoInfo> repos, Action<string>? onProgress = null, Regex? includeFilter = null, Regex? excludeFilter = null)
     {
         var functions = new List<FunctionMetrics>();
 
@@ -67,7 +68,7 @@ public class LizardRunner
                 Console.Error.WriteLine($"Lizard warnings: {error[..Math.Min(error.Length, 500)]}");
             }
 
-            functions = ParseLizardCsv(output, rootPath, repos);
+            functions = ParseLizardCsv(output, rootPath, repos, includeFilter, excludeFilter);
             onProgress?.Invoke($"Lizard found {functions.Count} functions in non-C# files.");
         }
         catch (Exception ex)
@@ -82,7 +83,7 @@ public class LizardRunner
     /// Parses Lizard CSV output into FunctionMetrics.
     /// CSV columns: NLOC, CCN, Token, PARAM, Length, Location, File, Function, Start, End
     /// </summary>
-    private List<FunctionMetrics> ParseLizardCsv(string csv, string rootPath, List<RepoInfo> repos)
+    private List<FunctionMetrics> ParseLizardCsv(string csv, string rootPath, List<RepoInfo> repos, Regex? includeFilter, Regex? excludeFilter)
     {
         var functions = new List<FunctionMetrics>();
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -122,6 +123,12 @@ public class LizardRunner
                 }
 
                 var filePath = parts[6].Trim().Trim('"');
+
+                if (!CSharpAnalyzer.PassesFilter(filePath, includeFilter, excludeFilter))
+                {
+                    continue;
+                }
+
                 var functionName = parts[7].Trim().Trim('"');
                 var startLinePart = parts[^2].Trim().Trim('"');
                 var endLinePart = parts[^1].Trim().Trim('"');

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,7 +14,7 @@ public class CSharpAnalyzer
     /// <summary>
     /// Analyzes all .cs files under the given repo directories, running in parallel for performance.
     /// </summary>
-    public AnalysisResult AnalyzeRepos(string rootPath, Action<string>? onProgress = null)
+    public AnalysisResult AnalyzeRepos(string rootPath, Action<string>? onProgress = null, Regex? includeFilter = null, Regex? excludeFilter = null)
     {
         var result = new AnalysisResult
         {
@@ -38,6 +39,7 @@ public class CSharpAnalyzer
             var csFiles = Directory.EnumerateFiles(repoDir, "*.cs", SearchOption.AllDirectories)
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                          && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                .Where(f => PassesFilter(f, includeFilter, excludeFilter))
                 .ToList();
 
             int functionCount = 0;
@@ -104,6 +106,22 @@ public class CSharpAnalyzer
         return Directory.GetDirectories(rootPath)
             .Where(d => !Path.GetFileName(d).StartsWith('.'))
             .ToList();
+    }
+
+    internal static bool PassesFilter(string filePath, Regex? includeFilter, Regex? excludeFilter)
+    {
+        var normalized = filePath.Replace('\\', '/');
+        if (includeFilter != null && !includeFilter.IsMatch(normalized))
+        {
+            return false;
+        }
+
+        if (excludeFilter != null && excludeFilter.IsMatch(normalized))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
