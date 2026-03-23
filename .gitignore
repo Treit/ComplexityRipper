@@ -419,3 +419,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ComplexityRipper output files
+stats.json
+*.html
+!README.md
+
