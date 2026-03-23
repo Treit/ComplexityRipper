@@ -80,7 +80,7 @@ var inputOption = new Option<string>("--input", () => "stats.json", "Input JSON 
 var reportOutputOption = new Option<string>("--output", () => "code-complexity-report.html", "Output HTML file path");
 var thresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var thresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
-var themeOption = new Option<string>("--theme", () => "dark", "Report theme: dark, light, high-contrast, ink");
+var themeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 reportCommand.AddOption(inputOption);
 reportCommand.AddOption(reportOutputOption);
 reportCommand.AddOption(thresholdLinesOption);
@@ -120,7 +120,7 @@ var runStatsOption = new Option<string>("--stats", () => "stats.json", "Intermed
 var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
 var runCsharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
-var runThemeOption = new Option<string>("--theme", () => "dark", "Report theme: dark, light, high-contrast, ink");
+var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 runCommand.AddOption(runRootOption);
 runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
