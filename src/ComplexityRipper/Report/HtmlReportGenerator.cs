@@ -15,8 +15,8 @@ public class HtmlReportGenerator
     {
         var sb = new StringBuilder();
 
-        // Build ADO URL lookup from repo info
-        var adoUrls = data.Repos.ToDictionary(r => r.Name, r => r.AdoBaseUrl, StringComparer.OrdinalIgnoreCase);
+        // Build repo info lookup
+        var repoLookup = data.Repos.ToDictionary(r => r.Name, r => r, StringComparer.OrdinalIgnoreCase);
 
         // Classify functions
         var longFunctions = data.Functions
@@ -42,9 +42,9 @@ public class HtmlReportGenerator
         AppendSummaryCards(sb, data, longFunctions.Count, complexFunctions.Count, combinedRisk.Count);
         AppendLanguageBreakdown(sb, data);
         AppendDistributionCharts(sb, data, thresholdLines, thresholdComplexity);
-        AppendCombinedRiskTable(sb, combinedRisk, adoUrls);
-        AppendFunctionTable(sb, "Long Functions", $"Functions with {thresholdLines}+ lines", longFunctions, adoUrls, "long-functions");
-        AppendFunctionTable(sb, "High Complexity Functions", $"Functions with cyclomatic complexity ≥ {thresholdComplexity}", complexFunctions, adoUrls, "complex-functions");
+        AppendCombinedRiskTable(sb, combinedRisk, repoLookup);
+        AppendFunctionTable(sb, "Long Functions", $"Functions with {thresholdLines}+ lines", longFunctions, repoLookup, "long-functions");
+        AppendFunctionTable(sb, "High Complexity Functions", $"Functions with cyclomatic complexity ≥ {thresholdComplexity}", complexFunctions, repoLookup, "complex-functions");
         AppendRepoBreakdown(sb, data, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
         sb.AppendLine("</body>");
@@ -266,7 +266,7 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</div>");
     }
 
-    private void AppendCombinedRiskTable(StringBuilder sb, List<FunctionMetrics> functions, Dictionary<string, string?> adoUrls)
+    private void AppendCombinedRiskTable(StringBuilder sb, List<FunctionMetrics> functions, Dictionary<string, RepoInfo> repoLookup)
     {
         sb.AppendLine("<h2>⚠️ Combined Risk — Long AND Complex</h2>");
         if (functions.Count == 0)
@@ -274,10 +274,10 @@ tr:hover { background: var(--bg-tertiary); }
             sb.AppendLine("<p style=\"color: var(--green);\">No functions exceed both thresholds. 🎉</p>");
             return;
         }
-        AppendFunctionTable(sb, null, "Functions exceeding BOTH line count and complexity thresholds — highest refactoring priority", functions, adoUrls, "combined-risk");
+        AppendFunctionTable(sb, null, "Functions exceeding BOTH line count and complexity thresholds — highest refactoring priority", functions, repoLookup, "combined-risk");
     }
 
-    private void AppendFunctionTable(StringBuilder sb, string? title, string description, List<FunctionMetrics> functions, Dictionary<string, string?> adoUrls, string tableId)
+    private void AppendFunctionTable(StringBuilder sb, string? title, string description, List<FunctionMetrics> functions, Dictionary<string, RepoInfo> repoLookup, string tableId)
     {
         if (title != null)
         {
@@ -306,11 +306,39 @@ tr:hover { background: var(--bg-tertiary); }
 
         foreach (var f in functions)
         {
-            string fileLink = Encode(f.File);
-            if (adoUrls.TryGetValue(f.Repo, out var baseUrl) && baseUrl != null)
+            repoLookup.TryGetValue(f.Repo, out var repoInfo);
+            var baseUrl = repoInfo?.AdoBaseUrl;
+            var branch = repoInfo?.DefaultBranch ?? "main";
+
+            // Repo column: link to repo root
+            string repoCell = Encode(f.Repo);
+            if (baseUrl != null)
             {
-                var adoUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine);
-                fileLink = $"<a href=\"{Encode(adoUrl)}\" target=\"_blank\" title=\"{Encode(f.File)}\">{Encode(GetShortFileName(f.File))}</a>";
+                repoCell = $"<a href=\"{Encode(baseUrl)}\" target=\"_blank\">{Encode(f.Repo)}</a>";
+            }
+
+            // File column: link to file at line range
+            string fileCell = Encode(f.File);
+            if (baseUrl != null)
+            {
+                var fileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
+                fileCell = $"<a href=\"{Encode(fileUrl)}\" target=\"_blank\" title=\"{Encode(f.File)}\">{Encode(GetShortFileName(f.File))}</a>";
+            }
+
+            // Class column: link to file (so reader can find the class)
+            string classCell = Encode(f.ClassName ?? "");
+            if (baseUrl != null && f.ClassName != null)
+            {
+                var classFileUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, branch);
+                classCell = $"<a href=\"{Encode(classFileUrl)}\" target=\"_blank\">{Encode(f.ClassName)}</a>";
+            }
+
+            // Function column: link to file at exact start line
+            string funcCell = Encode(f.Function);
+            if (baseUrl != null)
+            {
+                var funcUrl = AdoUrlHelper.BuildFileUrl(baseUrl, f.File, f.StartLine, f.EndLine, branch);
+                funcCell = $"<a href=\"{Encode(funcUrl)}\" target=\"_blank\">{Encode(f.Function)}</a>";
             }
 
             var lineSeverity = GetSeverityClass(f.LineCount, 500, 300, 200);
@@ -318,10 +346,10 @@ tr:hover { background: var(--bg-tertiary); }
             var nestingSeverity = GetSeverityClass(f.MaxNestingDepth, 7, 5, 3);
 
             sb.AppendLine("<tr>");
-            sb.AppendLine($"  <td class=\"mono\">{Encode(f.Repo)}</td>");
-            sb.AppendLine($"  <td class=\"mono truncate\">{fileLink}</td>");
-            sb.AppendLine($"  <td class=\"mono truncate\">{Encode(f.ClassName ?? "")}</td>");
-            sb.AppendLine($"  <td class=\"mono\">{Encode(f.Function)}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
+            sb.AppendLine($"  <td class=\"mono truncate\">{fileCell}</td>");
+            sb.AppendLine($"  <td class=\"mono truncate\">{classCell}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{funcCell}</td>");
             sb.AppendLine($"  <td class=\"numeric {lineSeverity}\" data-v=\"{f.LineCount}\">{f.LineCount}</td>");
             sb.AppendLine($"  <td class=\"numeric {complexitySeverity}\" data-v=\"{f.CyclomaticComplexity}\">{f.CyclomaticComplexity}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{f.ParameterCount}\">{f.ParameterCount}</td>");
@@ -372,8 +400,14 @@ tr:hover { background: var(--bg-tertiary); }
             var longSeverity = longCount > 10 ? "severity-critical" : longCount > 3 ? "severity-high" : longCount > 0 ? "severity-medium" : "severity-ok";
             var complexSeverity = complexCount > 10 ? "severity-critical" : complexCount > 3 ? "severity-high" : complexCount > 0 ? "severity-medium" : "severity-ok";
 
+            string repoCell = Encode(group.Key);
+            if (repoInfo?.AdoBaseUrl != null)
+            {
+                repoCell = $"<a href=\"{Encode(repoInfo.AdoBaseUrl)}\" target=\"_blank\">{Encode(group.Key)}</a>";
+            }
+
             sb.AppendLine("<tr>");
-            sb.AppendLine($"  <td class=\"mono\">{Encode(group.Key)}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{fileCount}\">{fileCount}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{repoFunctions.Count}\">{repoFunctions.Count}</td>");
             sb.AppendLine($"  <td class=\"numeric {longSeverity}\" data-v=\"{longCount}\">{longCount}</td>");

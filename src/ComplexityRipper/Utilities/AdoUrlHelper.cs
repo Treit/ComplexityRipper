@@ -3,14 +3,15 @@ using System.Diagnostics;
 namespace ComplexityRipper.Utilities;
 
 /// <summary>
-/// Parses git remote URLs to extract ADO organization, project, and repo name.
-/// Builds ADO file URLs with line number ranges.
+/// Parses git remote URLs to extract base URLs for ADO and GitHub repos.
+/// Builds file URLs with line number ranges.
 /// </summary>
 public static class AdoUrlHelper
 {
     /// <summary>
-    /// Reads git remote -v from a repo directory and extracts the ADO base URL.
-    /// Returns null if the remote is not an ADO URL or if git fails.
+    /// Reads git remote -v from a repo directory and extracts the base URL.
+    /// Supports ADO and GitHub remotes.
+    /// Returns null if git fails or the remote is unrecognized.
     /// </summary>
     public static string? GetAdoBaseUrl(string repoPath)
     {
@@ -36,7 +37,7 @@ public static class AdoUrlHelper
             string output = process.StandardOutput.ReadToEnd();
             process.WaitForExit(5000);
 
-            return ParseAdoBaseUrl(output, Path.GetFileName(repoPath));
+            return ParseRemoteUrl(output);
         }
         catch
         {
@@ -45,43 +46,93 @@ public static class AdoUrlHelper
     }
 
     /// <summary>
-    /// Parses the output of `git remote -v` to extract an ADO base URL.
-    /// Supports both HTTPS and SSH remote formats.
+    /// Resolves the default branch for a repo (main or master).
+    /// Returns "main" if detection fails.
     /// </summary>
-    public static string? ParseAdoBaseUrl(string gitRemoteOutput, string fallbackRepoName)
+    public static string GetDefaultBranch(string repoPath)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "symbolic-ref refs/remotes/origin/HEAD",
+                WorkingDirectory = repoPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null)
+            {
+                return "main";
+            }
+
+            string output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(5000);
+
+            // Output: refs/remotes/origin/main
+            if (!string.IsNullOrEmpty(output))
+            {
+                return output.Split('/').Last();
+            }
+        }
+        catch
+        {
+            // fall through
+        }
+
+        return "main";
+    }
+
+    /// <summary>
+    /// Parses the output of `git remote -v` to extract a base URL.
+    /// Supports ADO (HTTPS and SSH) and GitHub remotes.
+    /// </summary>
+    public static string? ParseRemoteUrl(string gitRemoteOutput)
     {
         foreach (var line in gitRemoteOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var trimmed = line.Trim();
-
-            // HTTPS format: https://msdata@dev.azure.com/msdata/Sentinel%20Graph/_git/NEXT
-            // or: https://dev.azure.com/msdata/Sentinel Graph/_git/NEXT
-            if (trimmed.Contains("dev.azure.com"))
+            var tabParts = trimmed.Split('\t', StringSplitOptions.RemoveEmptyEntries);
+            if (tabParts.Length < 2)
             {
-                var urlPart = trimmed.Split('\t', ' ')[1];
-                if (urlPart.Contains("/_git/"))
+                continue;
+            }
+
+            var urlAndSuffix = tabParts[1];
+            if (!urlAndSuffix.Contains("(fetch)"))
+            {
+                continue;
+            }
+
+            // Strip the " (fetch)" suffix to get the raw URL
+            var fetchIdx = urlAndSuffix.LastIndexOf(" (fetch)", StringComparison.Ordinal);
+            var urlPart = fetchIdx >= 0 ? urlAndSuffix[..fetchIdx].Trim() : urlAndSuffix.Trim();
+
+            // ADO HTTPS: https://msdata@dev.azure.com/msdata/Sentinel%20Graph/_git/NEXT
+            if (urlPart.Contains("dev.azure.com") && urlPart.Contains("/_git/"))
+            {
+                var uri = new Uri(urlPart.Replace(" ", "%20"));
+                var segments = uri.AbsolutePath.Trim('/').Split('/');
+
+                if (segments.Length >= 4 && segments[^2] == "_git")
                 {
-                    // Extract org and project from URL
-                    var uri = new Uri(urlPart.Replace(" ", "%20"));
-                    var segments = uri.AbsolutePath.Trim('/').Split('/');
+                    var org = segments[0];
+                    var project = Uri.EscapeDataString(Uri.UnescapeDataString(
+                        string.Join("/", segments[1..^2])));
+                    var repo = segments[^1];
 
-                    // Path: /{org}/{project}/_git/{repo}
-                    if (segments.Length >= 4 && segments[^2] == "_git")
-                    {
-                        var org = segments[0];
-                        var project = Uri.EscapeDataString(Uri.UnescapeDataString(
-                            string.Join("/", segments[1..^2])));
-                        var repo = segments[^1];
-
-                        return $"https://dev.azure.com/{org}/{project}/_git/{repo}";
-                    }
+                    return $"https://dev.azure.com/{org}/{project}/_git/{repo}";
                 }
             }
 
-            // SSH format: git@ssh.dev.azure.com:v3/{org}/{project}/{repo}
-            if (trimmed.Contains("ssh.dev.azure.com"))
+            // ADO SSH: git@ssh.dev.azure.com:v3/{org}/{project}/{repo}
+            if (urlPart.Contains("ssh.dev.azure.com"))
             {
-                var parts = trimmed.Split(':');
+                var parts = urlPart.Split(':');
                 if (parts.Length >= 2)
                 {
                     var pathParts = parts[1].Split('/');
@@ -89,7 +140,7 @@ public static class AdoUrlHelper
                     {
                         var org = pathParts[1];
                         var project = Uri.EscapeDataString(pathParts[2]);
-                        var repo = pathParts[3].Split(new[] { ' ', '\t' })[0];
+                        var repo = pathParts[3].Split([' ', '\t'])[0];
                         if (repo.EndsWith(".git"))
                         {
                             repo = repo[..^4];
@@ -99,18 +150,93 @@ public static class AdoUrlHelper
                     }
                 }
             }
+
+            // GitHub HTTPS: https://github.com/{owner}/{repo}.git
+            if (urlPart.Contains("github.com"))
+            {
+                var cleaned = urlPart.TrimEnd('/');
+                if (cleaned.EndsWith(".git"))
+                {
+                    cleaned = cleaned[..^4];
+                }
+
+                try
+                {
+                    var uri = new Uri(cleaned);
+                    var segments = uri.AbsolutePath.Trim('/').Split('/');
+                    if (segments.Length >= 2)
+                    {
+                        return $"https://github.com/{segments[0]}/{segments[1]}";
+                    }
+                }
+                catch
+                {
+                    // fall through
+                }
+            }
+
+            // GitHub SSH: git@github.com:{owner}/{repo}.git
+            if (urlPart.StartsWith("git@github.com:"))
+            {
+                var path = urlPart["git@github.com:".Length..];
+                if (path.EndsWith(".git"))
+                {
+                    path = path[..^4];
+                }
+
+                var segments = path.Split('/');
+                if (segments.Length >= 2)
+                {
+                    return $"https://github.com/{segments[0]}/{segments[1]}";
+                }
+            }
         }
 
         return null;
     }
 
     /// <summary>
-    /// Builds a full ADO URL to a specific file and line range.
+    /// Parses the output of `git remote -v` to extract an ADO base URL.
+    /// Kept for backward compatibility with tests.
     /// </summary>
-    public static string BuildFileUrl(string adoBaseUrl, string relativeFilePath, int startLine, int endLine)
+    public static string? ParseAdoBaseUrl(string gitRemoteOutput, string fallbackRepoName) =>
+        ParseRemoteUrl(gitRemoteOutput);
+
+    /// <summary>
+    /// Returns true if the base URL is a GitHub URL.
+    /// </summary>
+    public static bool IsGitHub(string baseUrl) => baseUrl.Contains("github.com");
+
+    /// <summary>
+    /// Builds a URL to a specific file and line range, supporting both ADO and GitHub.
+    /// </summary>
+    public static string BuildFileUrl(string baseUrl, string relativeFilePath, int startLine, int endLine, string defaultBranch = "main")
     {
-        var normalizedPath = "/" + relativeFilePath.Replace('\\', '/');
-        var encodedPath = Uri.EscapeDataString(normalizedPath);
-        return $"{adoBaseUrl}?path={encodedPath}&line={startLine}&lineEnd={endLine}&lineStartColumn=1&lineEndColumn=1&lineStyle=plain&_a=contents";
+        var normalizedPath = relativeFilePath.Replace('\\', '/');
+
+        if (IsGitHub(baseUrl))
+        {
+            return $"{baseUrl}/blob/{defaultBranch}/{normalizedPath}#L{startLine}-L{endLine}";
+        }
+
+        // ADO format
+        var encodedPath = Uri.EscapeDataString("/" + normalizedPath);
+        return $"{baseUrl}?path={encodedPath}&line={startLine}&lineEnd={endLine}&lineStartColumn=1&lineEndColumn=1&lineStyle=plain&_a=contents";
+    }
+
+    /// <summary>
+    /// Builds a URL to a file (without line numbers), supporting both ADO and GitHub.
+    /// </summary>
+    public static string BuildFileUrl(string baseUrl, string relativeFilePath, string defaultBranch = "main")
+    {
+        var normalizedPath = relativeFilePath.Replace('\\', '/');
+
+        if (IsGitHub(baseUrl))
+        {
+            return $"{baseUrl}/blob/{defaultBranch}/{normalizedPath}";
+        }
+
+        var encodedPath = Uri.EscapeDataString("/" + normalizedPath);
+        return $"{baseUrl}?path={encodedPath}&_a=contents";
     }
 }

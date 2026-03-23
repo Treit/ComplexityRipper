@@ -46,6 +46,9 @@ public class RepoInfo
     [JsonPropertyName("adoBaseUrl")]
     public string? AdoBaseUrl { get; set; }
 
+    [JsonPropertyName("defaultBranch")]
+    public string DefaultBranch { get; set; } = "main";
+
     [JsonPropertyName("fileCount")]
     public int FileCount { get; set; }
 

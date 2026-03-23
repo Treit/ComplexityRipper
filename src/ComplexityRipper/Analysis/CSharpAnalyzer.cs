@@ -31,6 +31,9 @@ public class CSharpAnalyzer
             onProgress?.Invoke($"Scanning {repoName}...");
 
             var adoBaseUrl = Utilities.AdoUrlHelper.GetAdoBaseUrl(repoDir);
+            var defaultBranch = adoBaseUrl != null
+                ? Utilities.AdoUrlHelper.GetDefaultBranch(repoDir)
+                : "main";
 
             var csFiles = Directory.EnumerateFiles(repoDir, "*.cs", SearchOption.AllDirectories)
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
@@ -52,6 +55,7 @@ public class CSharpAnalyzer
             {
                 Name = repoName,
                 AdoBaseUrl = adoBaseUrl,
+                DefaultBranch = defaultBranch,
                 FileCount = csFiles.Count,
                 FunctionCount = functionCount,
             });
