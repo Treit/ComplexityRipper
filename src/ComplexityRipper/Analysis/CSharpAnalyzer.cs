@@ -27,7 +27,7 @@ public class CSharpAnalyzer
 
         Parallel.ForEach(repoDirs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, repoDir =>
         {
-            var repoName = Path.GetFileName(repoDir);
+            var repoName = Path.GetFileName(repoDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             onProgress?.Invoke($"Scanning {repoName}...");
 
             var adoBaseUrl = Utilities.AdoUrlHelper.GetAdoBaseUrl(repoDir);

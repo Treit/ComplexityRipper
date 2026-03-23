@@ -214,6 +214,35 @@ class C
         }
     }
 
+    [Fact]
+    public void AnalyzeRepos_TrailingBackslash_RepoNameNotBlank()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"test_repo_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        Directory.CreateDirectory(Path.Combine(tempDir, ".git"));
+        File.WriteAllText(Path.Combine(tempDir, "Test.cs"), @"
+class C
+{
+    void M() { }
+}");
+
+        try
+        {
+            var analyzer = new CSharpAnalyzer();
+            var rootWithTrailingSlash = tempDir + Path.DirectorySeparatorChar;
+            var result = analyzer.AnalyzeRepos(rootWithTrailingSlash);
+
+            Assert.Single(result.Repos);
+            Assert.NotEmpty(result.Repos[0].Name);
+            Assert.Single(result.Functions);
+            Assert.NotEmpty(result.Functions[0].Repo);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
     private static string WriteTempFile(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.cs");
