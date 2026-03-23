@@ -22,6 +22,9 @@ public class FunctionMetrics
     [JsonPropertyName("function")]
     public string Function { get; set; } = string.Empty;
 
+    [JsonPropertyName("project")]
+    public string? Project { get; set; }
+
     [JsonPropertyName("startLine")]
     public int StartLine { get; set; }
 

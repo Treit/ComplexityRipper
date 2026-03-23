@@ -41,11 +41,14 @@ public class CSharpAnalyzer
                 .ToList();
 
             int functionCount = 0;
+            var projectResolver = new ProjectResolver(repoDir);
             foreach (var file in csFiles)
             {
+                var projectName = projectResolver.GetProjectName(file);
                 var functions = AnalyzeFile(file, repoDir, repoName);
                 foreach (var func in functions)
                 {
+                    func.Project = projectName;
                     allFunctions.Add(func);
                     Interlocked.Increment(ref functionCount);
                 }
@@ -233,6 +236,69 @@ public class CSharpAnalyzer
                 ParameterCount = parameterCount,
                 MaxNestingDepth = nestingDepth,
             });
+        }
+    }
+}
+
+/// <summary>
+/// Resolves the nearest .NET project file for a given source file by walking up
+/// the directory tree. Caches results per directory to avoid redundant I/O.
+/// </summary>
+internal class ProjectResolver
+{
+    private static readonly string[] ProjectExtensions = ["*.csproj", "*.fsproj", "*.vbproj"];
+    private readonly string _repoRoot;
+    private readonly Dictionary<string, string?> _cache = new(StringComparer.OrdinalIgnoreCase);
+
+    public ProjectResolver(string repoRoot)
+    {
+        _repoRoot = Path.GetFullPath(repoRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    public string? GetProjectName(string sourceFilePath)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(sourceFilePath));
+        if (dir == null)
+        {
+            return null;
+        }
+
+        while (dir != null && dir.StartsWith(_repoRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_cache.TryGetValue(dir, out var cached))
+            {
+                return cached;
+            }
+
+            foreach (var pattern in ProjectExtensions)
+            {
+                var projFiles = Directory.GetFiles(dir, pattern);
+                if (projFiles.Length > 0)
+                {
+                    var name = Path.GetFileNameWithoutExtension(projFiles[0]);
+                    CacheUpTo(Path.GetDirectoryName(Path.GetFullPath(sourceFilePath))!, dir, name);
+                    return name;
+                }
+            }
+
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        return null;
+    }
+
+    private void CacheUpTo(string fromDir, string toDir, string? projectName)
+    {
+        var dir = fromDir;
+        while (dir != null && dir.Length >= toDir.Length)
+        {
+            _cache[dir] = projectName;
+            if (string.Equals(dir, toDir, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            dir = Path.GetDirectoryName(dir);
         }
     }
 }

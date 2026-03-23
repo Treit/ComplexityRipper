@@ -293,14 +293,15 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine($"<table id=\"{tableId}\">");
         sb.AppendLine("<thead><tr>");
         sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 0, 'string')\">Repo <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 1, 'string')\">File <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 2, 'string')\">Class <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 3, 'string')\">Function <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 4, 'number')\" class=\"numeric\">Lines <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 5, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 6, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 7, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 8, 'string')\">Language <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 1, 'string')\">Project <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 2, 'string')\">File <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 3, 'string')\">Class <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 4, 'string')\">Function <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 5, 'number')\" class=\"numeric\">Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 6, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 7, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 8, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 9, 'string')\">Language <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("</tr></thead>");
         sb.AppendLine("<tbody>");
 
@@ -347,6 +348,7 @@ tr:hover { background: var(--bg-tertiary); }
 
             sb.AppendLine("<tr>");
             sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
+            sb.AppendLine($"  <td class=\"mono\">{Encode(f.Project ?? "")}</td>");
             sb.AppendLine($"  <td class=\"mono truncate\">{fileCell}</td>");
             sb.AppendLine($"  <td class=\"mono truncate\">{classCell}</td>");
             sb.AppendLine($"  <td class=\"mono\">{funcCell}</td>");
