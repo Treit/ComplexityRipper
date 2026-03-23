@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- dotnet tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>complexityripper</ToolCommandName>
+
+    <!-- NuGet metadata -->
+    <PackageId>ComplexityRipper</PackageId>
+    <Authors>Treit</Authors>
+    <Title>ComplexityRipper</Title>
+    <Description>A Roslyn-based code complexity analyzer that scans C# repos for long functions, high cyclomatic complexity, and deep nesting. Also supports Python, TypeScript, Go, and other languages via Lizard integration. Generates HTML reports with ADO/GitHub hyperlinks.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Treit/ComplexityRipper</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Treit/ComplexityRipper</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>complexity;cyclomatic;roslyn;csharp;analysis;metrics;code-quality;dotnet-tool</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>
