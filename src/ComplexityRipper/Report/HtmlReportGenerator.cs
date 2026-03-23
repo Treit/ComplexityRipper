@@ -34,7 +34,6 @@ public class HtmlReportGenerator
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
         AppendSummaryCards(sb, data, totalLong, totalComplex, totalCombined);
         AppendRepoRanking(sb, repoStats);
-        AppendLanguageBreakdown(sb, data);
         AppendDistributionCharts(sb, data, thresholdLines, thresholdComplexity);
         AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
@@ -277,12 +276,6 @@ tr:hover { background: var(--bg-tertiary); }
 .bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: fit-content; color: #fff; }
 .bar-count { font-size: 12px; color: var(--text-muted); margin-left: 8px; flex-shrink: 0; width: 60px; }
 
-/* Language breakdown */
-.lang-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.lang-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; padding: 12px; text-align: center; }
-.lang-name { font-size: 14px; font-weight: 600; }
-.lang-stats { font-size: 12px; color: var(--text-muted); }
-
 @media (max-width: 768px) {
     .chart-grid { grid-template-columns: 1fr; }
     .cards { grid-template-columns: repeat(2, 1fr); }
@@ -322,30 +315,6 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine($"<td><span class=\"summary-value {complexClass}\">{complexCount:N0}</span> complex</td>");
         sb.AppendLine($"<td><span class=\"summary-value {combinedClass}\">{combinedCount:N0}</span> combined risk</td>");
         sb.AppendLine("</tr></tbody></table>");
-    }
-
-    private void AppendLanguageBreakdown(StringBuilder sb, AnalysisResult data)
-    {
-        if (data.Summary.LanguageBreakdown.Count == 0)
-        {
-            return;
-        }
-
-        sb.AppendLine("<h2>Language Breakdown</h2>");
-        sb.AppendLine("<div class=\"lang-grid\">");
-        foreach (var (lang, stats) in data.Summary.LanguageBreakdown.OrderByDescending(kv => kv.Value.Functions))
-        {
-            sb.AppendLine("<div class=\"lang-card\">");
-            sb.AppendLine($"  <div class=\"lang-name\">{Encode(lang)}</div>");
-            sb.AppendLine($"  <div class=\"lang-stats\">{stats.Functions:N0} functions</div>");
-            if (stats.Files > 0)
-            {
-                sb.AppendLine($"  <div class=\"lang-stats\">{stats.Files:N0} files</div>");
-            }
-
-            sb.AppendLine("</div>");
-        }
-        sb.AppendLine("</div>");
     }
 
     private void AppendDistributionCharts(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity)
