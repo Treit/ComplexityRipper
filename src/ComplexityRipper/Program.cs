@@ -67,7 +67,7 @@ var reportCommand = new Command("report", "Generate HTML report from analysis JS
 var inputOption = new Option<string>("--input", () => "stats.json", "Input JSON file path");
 var reportOutputOption = new Option<string>("--output", () => "code-complexity-report.html", "Output HTML file path");
 var thresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
-var thresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
+var thresholdComplexityOption = new Option<int>("--threshold-complexity", () => 25, "Cyclomatic complexity threshold for flagging functions");
 var themeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 reportCommand.AddOption(inputOption);
 reportCommand.AddOption(reportOutputOption);
@@ -106,7 +106,7 @@ var runRootOption = new Option<string>("--root", "Root directory containing repo
 var runOutputOption = new Option<string>("--output", () => "code-complexity-report.html", "Output HTML report file path");
 var runStatsOption = new Option<string>("--stats", () => "stats.json", "Intermediate stats JSON file path");
 var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
-var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
+var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 25, "Cyclomatic complexity threshold for flagging functions");
 var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 var runIncludeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
 var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");

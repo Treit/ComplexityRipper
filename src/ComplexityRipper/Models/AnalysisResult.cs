@@ -35,7 +35,7 @@ public class Thresholds
     public int MaxLines { get; set; } = 200;
 
     [JsonPropertyName("maxComplexity")]
-    public int MaxComplexity { get; set; } = 15;
+    public int MaxComplexity { get; set; } = 25;
 }
 
 public class RepoInfo

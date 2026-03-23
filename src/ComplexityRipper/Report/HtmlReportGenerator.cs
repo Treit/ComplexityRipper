@@ -11,7 +11,7 @@ namespace ComplexityRipper.Report;
 /// </summary>
 public class HtmlReportGenerator
 {
-    public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 15, string theme = "light")
+    public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 25, string theme = "light")
     {
         var sb = new StringBuilder();
 
