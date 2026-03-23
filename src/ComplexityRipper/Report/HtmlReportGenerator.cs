@@ -287,7 +287,23 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("<div class=\"table-container\">");
         sb.AppendLine("<div class=\"table-header\">");
         sb.AppendLine($"  <span style=\"color: var(--text-muted); font-size: 13px;\">{Encode(description)}</span>");
-        sb.AppendLine($"  <input type=\"text\" class=\"table-filter\" placeholder=\"Filter...\" oninput=\"filterTable('{tableId}', this.value)\">");
+        sb.AppendLine("  <div style=\"display: flex; gap: 8px;\">");
+
+        // Repo dropdown filter
+        var repos = functions.Select(f => f.Repo).Where(r => !string.IsNullOrEmpty(r)).Distinct().OrderBy(r => r).ToList();
+        if (repos.Count > 1)
+        {
+            sb.AppendLine($"    <select class=\"table-filter\" onchange=\"filterByRepo('{tableId}', this.value, 0)\">");
+            sb.AppendLine("      <option value=\"\">All repos</option>");
+            foreach (var repo in repos)
+            {
+                sb.AppendLine($"      <option value=\"{Encode(repo)}\">{Encode(repo)}</option>");
+            }
+            sb.AppendLine("    </select>");
+        }
+
+        sb.AppendLine($"    <input type=\"text\" class=\"table-filter\" placeholder=\"Filter...\" oninput=\"filterTable('{tableId}', this.value)\">");
+        sb.AppendLine("  </div>");
         sb.AppendLine("</div>");
 
         sb.AppendLine($"<table id=\"{tableId}\">");
@@ -482,10 +498,33 @@ function filterTable(tableId, query) {
     const table = document.getElementById(tableId);
     const rows = table.querySelectorAll('tbody tr');
     const q = query.toLowerCase();
-    
+    const repoFilter = (tableFilters[tableId] || '').toLowerCase();
+
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(q) ? '' : 'none';
+        const repoText = (row.cells[0]?.textContent || '').toLowerCase();
+        const matchesText = !q || text.includes(q);
+        const matchesRepo = !repoFilter || repoText === repoFilter;
+        row.style.display = (matchesText && matchesRepo) ? '' : 'none';
+    });
+}
+
+const tableFilters = {};
+
+function filterByRepo(tableId, repo, colIndex) {
+    tableFilters[tableId] = repo;
+    const table = document.getElementById(tableId);
+    const rows = table.querySelectorAll('tbody tr');
+    const r = repo.toLowerCase();
+    const textInput = table.closest('.table-container')?.querySelector('input.table-filter');
+    const q = (textInput?.value || '').toLowerCase();
+
+    rows.forEach(row => {
+        const repoText = (row.cells[colIndex]?.textContent || '').toLowerCase();
+        const text = row.textContent.toLowerCase();
+        const matchesRepo = !r || repoText === r;
+        const matchesText = !q || text.includes(q);
+        row.style.display = (matchesRepo && matchesText) ? '' : 'none';
     });
 }
 ";
