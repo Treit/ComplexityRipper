@@ -14,7 +14,7 @@
     <PackageId>ComplexityRipper</PackageId>
     <Authors>Treit</Authors>
     <Title>ComplexityRipper</Title>
-    <Description>A Roslyn-based code complexity analyzer that scans C# repos for long functions, high cyclomatic complexity, and deep nesting. Also supports Python, TypeScript, Go, and other languages via Lizard integration. Generates HTML reports with ADO/GitHub hyperlinks.</Description>
+    <Description>A Roslyn-based code complexity analyzer that scans C# repos for long functions, high cyclomatic complexity, and deep nesting. Generates HTML reports with ADO/GitHub hyperlinks.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/Treit/ComplexityRipper</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Treit/ComplexityRipper</RepositoryUrl>

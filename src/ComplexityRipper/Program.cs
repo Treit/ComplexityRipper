@@ -14,22 +14,20 @@ var jsonOptions = new JsonSerializerOptions
 };
 
 // Root command
-var rootCommand = new RootCommand("Code Complexity Analyzer — Roslyn + Lizard hybrid analysis tool");
+var rootCommand = new RootCommand("Roslyn-based code complexity analyzer for C#");
 
 // analyze command — scans repos and outputs JSON
 var analyzeCommand = new Command("analyze", "Scan repositories and generate analysis JSON");
 var rootPathOption = new Option<string>("--root", "Root directory containing repos to analyze") { IsRequired = true };
 var outputOption = new Option<string>("--output", () => "stats.json", "Output JSON file path");
-var csharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
 var includeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
 var excludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
 analyzeCommand.AddOption(rootPathOption);
 analyzeCommand.AddOption(outputOption);
-analyzeCommand.AddOption(csharpOnlyOption);
 analyzeCommand.AddOption(includeOption);
 analyzeCommand.AddOption(excludeOption);
 
-analyzeCommand.SetHandler(async (string root, string output, bool csharpOnly, string? include, string? exclude) =>
+analyzeCommand.SetHandler(async (string root, string output, string? include, string? exclude) =>
 {
     if (!Directory.Exists(root))
     {
@@ -53,41 +51,16 @@ analyzeCommand.SetHandler(async (string root, string output, bool csharpOnly, st
 
     Console.WriteLine();
 
-    var csharpAnalyzer = new CSharpAnalyzer();
-    var result = csharpAnalyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  [C#] {msg}"), includeFilter, excludeFilter);
+    var analyzer = new CSharpAnalyzer();
+    var result = analyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  {msg}"), includeFilter, excludeFilter);
 
-    Console.WriteLine($"  [C#] Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
-
-    if (!csharpOnly)
-    {
-        var lizardRunner = new LizardRunner();
-        var otherFunctions = lizardRunner.Analyze(root, result.Repos, msg => Console.WriteLine($"  [Lizard] {msg}"), includeFilter, excludeFilter);
-
-        result.Functions.AddRange(otherFunctions);
-
-        var langGroups = otherFunctions.GroupBy(f => f.Language);
-        foreach (var group in langGroups)
-        {
-            if (!result.Summary.LanguageBreakdown.ContainsKey(group.Key))
-            {
-                result.Summary.LanguageBreakdown[group.Key] = new LanguageStats();
-            }
-
-            result.Summary.LanguageBreakdown[group.Key].Functions += group.Count();
-        }
-
-        result.Summary.TotalFunctions = result.Functions.Count;
-        Console.WriteLine($"  [Lizard] Added {otherFunctions.Count:N0} functions from other languages");
-    }
-
-    Console.WriteLine();
-    Console.WriteLine($"Total: {result.Functions.Count:N0} functions analyzed");
+    Console.WriteLine($"Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
 
     var json = JsonSerializer.Serialize(result, jsonOptions);
     await File.WriteAllTextAsync(output, json);
     Console.WriteLine($"Stats written to: {output}");
 
-}, rootPathOption, outputOption, csharpOnlyOption, includeOption, excludeOption);
+}, rootPathOption, outputOption, includeOption, excludeOption);
 
 // report command — reads JSON and generates HTML
 var reportCommand = new Command("report", "Generate HTML report from analysis JSON");
@@ -134,7 +107,6 @@ var runOutputOption = new Option<string>("--output", () => "code-complexity-repo
 var runStatsOption = new Option<string>("--stats", () => "stats.json", "Intermediate stats JSON file path");
 var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 15, "Cyclomatic complexity threshold for flagging functions");
-var runCsharpOnlyOption = new Option<bool>("--csharp-only", () => false, "Only analyze C# files (skip Lizard)");
 var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 var runIncludeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
 var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
@@ -143,7 +115,6 @@ runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
 runCommand.AddOption(runThresholdLinesOption);
 runCommand.AddOption(runThresholdComplexityOption);
-runCommand.AddOption(runCsharpOnlyOption);
 runCommand.AddOption(runThemeOption);
 runCommand.AddOption(runIncludeOption);
 runCommand.AddOption(runExcludeOption);
@@ -155,7 +126,6 @@ runCommand.SetHandler(async (InvocationContext ctx) =>
     var statsPath = ctx.ParseResult.GetValueForOption(runStatsOption)!;
     var thresholdLines = ctx.ParseResult.GetValueForOption(runThresholdLinesOption);
     var thresholdComplexity = ctx.ParseResult.GetValueForOption(runThresholdComplexityOption);
-    var csharpOnly = ctx.ParseResult.GetValueForOption(runCsharpOnlyOption);
     var theme = ctx.ParseResult.GetValueForOption(runThemeOption)!;
     var include = ctx.ParseResult.GetValueForOption(runIncludeOption);
     var exclude = ctx.ParseResult.GetValueForOption(runExcludeOption);
@@ -182,35 +152,10 @@ runCommand.SetHandler(async (InvocationContext ctx) =>
 
     Console.WriteLine();
 
-    var csharpAnalyzer = new CSharpAnalyzer();
-    var result = csharpAnalyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  [C#] {msg}"), includeFilter, excludeFilter);
+    var analyzer = new CSharpAnalyzer();
+    var result = analyzer.AnalyzeRepos(root, msg => Console.WriteLine($"  {msg}"), includeFilter, excludeFilter);
 
-    Console.WriteLine($"  [C#] Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
-
-    if (!csharpOnly)
-    {
-        var lizardRunner = new LizardRunner();
-        var otherFunctions = lizardRunner.Analyze(root, result.Repos, msg => Console.WriteLine($"  [Lizard] {msg}"), includeFilter, excludeFilter);
-
-        result.Functions.AddRange(otherFunctions);
-
-        var langGroups = otherFunctions.GroupBy(f => f.Language);
-        foreach (var group in langGroups)
-        {
-            if (!result.Summary.LanguageBreakdown.ContainsKey(group.Key))
-            {
-                result.Summary.LanguageBreakdown[group.Key] = new LanguageStats();
-            }
-
-            result.Summary.LanguageBreakdown[group.Key].Functions += group.Count();
-        }
-
-        result.Summary.TotalFunctions = result.Functions.Count;
-        Console.WriteLine($"  [Lizard] Added {otherFunctions.Count:N0} functions from other languages");
-    }
-
-    Console.WriteLine();
-    Console.WriteLine($"Total: {result.Functions.Count:N0} functions analyzed");
+    Console.WriteLine($"Found {result.Functions.Count:N0} functions in {result.Summary.TotalFiles:N0} files across {result.Summary.TotalRepos} repos");
 
     var json = JsonSerializer.Serialize(result, jsonOptions);
     await File.WriteAllTextAsync(statsPath, json);

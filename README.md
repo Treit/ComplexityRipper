@@ -3,7 +3,7 @@
 [![CI](https://github.com/Treit/ComplexityRipper/actions/workflows/ci.yml/badge.svg)](https://github.com/Treit/ComplexityRipper/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/ComplexityRipper.svg)](https://www.nuget.org/packages/ComplexityRipper/)
 
-A Roslyn-based code complexity analyzer that scans C# repositories for long functions, high cyclomatic complexity, and deep nesting. Also supports Python, TypeScript, Go, and other languages via [Lizard](https://github.com/terryyin/lizard) integration. Generates self-contained HTML reports with hyperlinks to source files.
+A Roslyn-based code complexity analyzer that scans C# repositories for long functions, high cyclomatic complexity, and deep nesting. Generates self-contained HTML reports with hyperlinks to source files in Azure DevOps and GitHub.
 
 ## Installation
 
@@ -51,12 +51,11 @@ Flag functions with 300+ lines or cyclomatic complexity of 20+:
 complexityripper run --root C:\src\my-repos --threshold-lines 300 --threshold-complexity 20
 ```
 
-### C# only (skip Lizard)
-
-If you only care about C# or don't have Lizard installed:
+### Include/exclude repos
 
 ```powershell
-complexityripper run --root C:\src\my-repos --csharp-only
+complexityripper run --root C:\src\my-repos --include "ProjectA|ProjectB"
+complexityripper run --root C:\src\my-repos --exclude "Tests|Legacy"
 ```
 
 ### Two-step workflow: analyze once, adjust thresholds later
@@ -73,7 +72,7 @@ complexityripper report --input stats.json --threshold-lines 500 --output lenien
 ### Analyze only (JSON output)
 
 ```powershell
-complexityripper analyze --root C:\src\my-repos --output stats.json --csharp-only
+complexityripper analyze --root C:\src\my-repos --output stats.json
 ```
 
 ### Generate report from existing JSON
@@ -101,7 +100,9 @@ complexityripper report --input stats.json --output report.html --threshold-line
 | `--stats` | `stats.json` | Intermediate stats JSON file path |
 | `--threshold-lines` | `200` | Line count threshold for flagging functions |
 | `--threshold-complexity` | `15` | Cyclomatic complexity threshold |
-| `--csharp-only` | `false` | Only analyze C# files (skip Lizard) |
+| `--theme` | `light` | Report theme: light, dark, high-contrast, ink |
+| `--include` | | Regex to include repos (use \| for OR) |
+| `--exclude` | | Regex to exclude repos (use \| for OR) |
 
 ### `analyze`
 
@@ -109,7 +110,8 @@ complexityripper report --input stats.json --output report.html --threshold-line
 |--------|---------|-------------|
 | `--root` | *(required)* | Root directory to scan |
 | `--output` | `stats.json` | Output JSON file path |
-| `--csharp-only` | `false` | Only analyze C# files (skip Lizard) |
+| `--include` | | Regex to include repos (use \| for OR) |
+| `--exclude` | | Regex to exclude repos (use \| for OR) |
 
 ### `report`
 
@@ -130,10 +132,6 @@ For C# files, ComplexityRipper uses the Roslyn compiler APIs (`Microsoft.CodeAna
 **Cyclomatic complexity** -- decision points (see table below).
 **Parameter count** -- number of parameters.
 **Max nesting depth** -- deepest nesting of control flow blocks.
-
-### Other Languages (Lizard)
-
-For Python, TypeScript, JavaScript, Go, and other languages, ComplexityRipper invokes [Lizard](https://github.com/terryyin/lizard) (must be installed separately) as a single process. Rust files are excluded because Lizard cannot reliably detect Rust function boundaries.
 
 ### Hyperlinks
 
