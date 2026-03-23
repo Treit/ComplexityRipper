@@ -262,6 +262,7 @@ tr:hover { background: var(--bg-tertiary); }
 .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 12px; }
 .truncate { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .count-badge { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+.count-badge.severity-critical, .count-badge.severity-high, .count-badge.severity-medium, .count-badge.severity-ok { font-weight: 700; }
 .repo-separator td { background: var(--bg-tertiary); border-top: 2px solid var(--border); }
 .repo-heading { font-weight: 700; font-size: 14px; padding: 10px 12px; }
 .repo-detail-section { margin: 24px 0; padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
@@ -276,7 +277,7 @@ tr:hover { background: var(--bg-tertiary); }
 .bar-row { display: flex; align-items: center; gap: 8px; }
 .bar-label { width: 100px; text-align: right; font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
 .bar-track { flex: 1; background: var(--bg-tertiary); border-radius: 3px; height: 22px; position: relative; }
-.bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: fit-content; }
+.bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: fit-content; color: #fff; }
 .bar-count { font-size: 12px; color: var(--text-muted); margin-left: 8px; flex-shrink: 0; width: 60px; }
 
 /* Language breakdown */
@@ -515,7 +516,7 @@ tr:hover { background: var(--bg-tertiary); }
 
             if (repo.Combined.Count > 0)
             {
-                AppendRepoFunctionTable(sb, "Combined Risk", repo.Combined, repo, $"{tablePrefix}-combined");
+                AppendRepoFunctionTable(sb, "Combined Risk (Long + Complex)", repo.Combined, repo, $"{tablePrefix}-combined");
             }
 
             if (repo.Long.Count > 0)
