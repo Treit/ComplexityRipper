@@ -243,6 +243,88 @@ class C
         }
     }
 
+    [Fact]
+    public void AnalyzeRepos_OrganizationalFolder_DescendsIntoSubfolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"test_org_{Guid.NewGuid():N}");
+        var orgFolder = Path.Combine(root, "my_project");
+        var repoA = Path.Combine(orgFolder, "RepoA");
+        var repoB = Path.Combine(orgFolder, "RepoB");
+
+        Directory.CreateDirectory(Path.Combine(repoA, ".git"));
+        Directory.CreateDirectory(Path.Combine(repoB, ".git"));
+        File.WriteAllText(Path.Combine(repoA, "A.cs"), "class A { void M() { } }");
+        File.WriteAllText(Path.Combine(repoB, "B.cs"), "class B { void N() { } }");
+
+        try
+        {
+            var analyzer = new CSharpAnalyzer();
+            var result = analyzer.AnalyzeRepos(root);
+
+            Assert.Equal(2, result.Repos.Count);
+            Assert.Contains(result.Repos, r => r.Name == "my_project/RepoA");
+            Assert.Contains(result.Repos, r => r.Name == "my_project/RepoB");
+            Assert.Equal(2, result.Functions.Count);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void AnalyzeRepos_MixedReposAndOrgFolders_FindsAll()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"test_mixed_{Guid.NewGuid():N}");
+        var directRepo = Path.Combine(root, "DirectRepo");
+        var orgFolder = Path.Combine(root, "org_folder");
+        var nestedRepo = Path.Combine(orgFolder, "NestedRepo");
+
+        Directory.CreateDirectory(Path.Combine(directRepo, ".git"));
+        Directory.CreateDirectory(Path.Combine(nestedRepo, ".git"));
+        File.WriteAllText(Path.Combine(directRepo, "D.cs"), "class D { void X() { } }");
+        File.WriteAllText(Path.Combine(nestedRepo, "N.cs"), "class N { void Y() { } }");
+
+        try
+        {
+            var analyzer = new CSharpAnalyzer();
+            var result = analyzer.AnalyzeRepos(root);
+
+            Assert.Equal(2, result.Repos.Count);
+            Assert.Contains(result.Repos, r => r.Name == "DirectRepo");
+            Assert.Contains(result.Repos, r => r.Name == "org_folder/NestedRepo");
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void AnalyzeRepos_NonRepoSubfolder_WithNoNestedRepos_Skipped()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"test_empty_org_{Guid.NewGuid():N}");
+        var emptyOrg = Path.Combine(root, "empty_org");
+        var realRepo = Path.Combine(root, "RealRepo");
+
+        Directory.CreateDirectory(emptyOrg);
+        Directory.CreateDirectory(Path.Combine(realRepo, ".git"));
+        File.WriteAllText(Path.Combine(realRepo, "R.cs"), "class R { void Z() { } }");
+
+        try
+        {
+            var analyzer = new CSharpAnalyzer();
+            var result = analyzer.AnalyzeRepos(root);
+
+            Assert.Single(result.Repos);
+            Assert.Equal("RealRepo", result.Repos[0].Name);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static string WriteTempFile(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.cs");

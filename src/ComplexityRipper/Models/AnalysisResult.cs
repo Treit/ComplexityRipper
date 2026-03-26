@@ -49,6 +49,9 @@ public class RepoInfo
     [JsonPropertyName("defaultBranch")]
     public string DefaultBranch { get; set; } = "main";
 
+    [JsonPropertyName("lifecycle")]
+    public string? Lifecycle { get; set; }
+
     [JsonPropertyName("fileCount")]
     public int FileCount { get; set; }
 

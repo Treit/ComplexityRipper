@@ -33,7 +33,7 @@ public class HtmlReportGenerator
         sb.AppendLine("<body>");
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
         AppendSummaryCards(sb, data, totalLong, totalComplex, totalCombined);
-        AppendRepoRanking(sb, repoStats);
+        AppendRepoRanking(sb, repoStats, thresholdLines, thresholdComplexity);
         AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
         sb.AppendLine("</body>");
@@ -46,6 +46,7 @@ public class HtmlReportGenerator
         string Name,
         string? BaseUrl,
         string DefaultBranch,
+        string? Lifecycle,
         int FileCount,
         int FunctionCount,
         int LongCount,
@@ -100,6 +101,7 @@ public class HtmlReportGenerator
             Name: repoName,
             BaseUrl: info?.AdoBaseUrl,
             DefaultBranch: info?.DefaultBranch ?? "main",
+            Lifecycle: info?.Lifecycle,
             FileCount: info?.FileCount ?? 0,
             FunctionCount: functions.Count,
             LongCount: longFuncs.Count,
@@ -125,7 +127,15 @@ public class HtmlReportGenerator
         sb.AppendLine(GetThemeCss());
         sb.AppendLine(GetLayoutCss());
         sb.AppendLine("</style>");
-        sb.AppendLine($"<script>document.documentElement.setAttribute('data-theme', '{defaultTheme}');</script>");
+        sb.AppendLine($@"<script>(function() {{
+  var t = localStorage.getItem('sentinel-reports-theme');
+  if (!t) {{
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) t = 'light';
+    else t = '{defaultTheme}';
+  }}
+  document.documentElement.setAttribute('data-theme', t);
+}})()</script>");
         sb.AppendLine("</head>");
     }
 
@@ -261,6 +271,10 @@ tr:hover { background: var(--bg-tertiary); }
 .count-badge.severity-high { background: var(--severity-high); color: #fff; border-color: var(--severity-high); font-weight: 700; }
 .count-badge.severity-medium { background: var(--severity-medium); color: #fff; border-color: var(--severity-medium); font-weight: 700; }
 .count-badge.severity-ok { color: var(--severity-ok); font-weight: 700; }
+.lc-ga { color: var(--severity-ok); font-weight: 600; }
+.lc-dev { color: var(--severity-medium); }
+.lc-preview { color: var(--info); }
+.lc-closing { color: var(--text-muted); font-style: italic; }
 .repo-separator td { background: var(--bg-tertiary); border-top: 2px solid var(--border); }
 .repo-heading { font-weight: 700; font-size: 14px; padding: 10px 12px; }
 .repo-detail-section { margin: 24px 0; padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
@@ -383,7 +397,7 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</div>");
     }
 
-    private void AppendRepoRanking(StringBuilder sb, List<RepoStatsRow> repoStats)
+    private void AppendRepoRanking(StringBuilder sb, List<RepoStatsRow> repoStats, int thresholdLines, int thresholdComplexity)
     {
         sb.AppendLine("<h2>Repository Ranking</h2>");
         sb.AppendLine("<div class=\"table-container\">");
@@ -396,14 +410,15 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("<thead><tr>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 0, 'number')\" class=\"numeric\"># <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 1, 'string')\">Repository <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 2, 'number')\" class=\"numeric\">Concern Score <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 3, 'number')\" class=\"numeric\">Files <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 4, 'number')\" class=\"numeric\">Functions <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 5, 'number')\" class=\"numeric\">Combined <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 6, 'number')\" class=\"numeric\">Long <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 7, 'number')\" class=\"numeric\">Complex <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 8, 'number')\" class=\"numeric\">Max CC <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 9, 'number')\" class=\"numeric\">Max Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 2, 'string')\">Lifecycle <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('repo-ranking', 3, 'number')\" class=\"numeric\" title=\"Weighted sum: 10 pts per combined-risk function (exceeds both thresholds), 3 pts per complex-only, 2 pts per long-only. Bonus: +5 if complexity &gt;= {thresholdComplexity * 2}, +3 if lines &gt;= {thresholdLines * 2}.\">Concern Score <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 4, 'number')\" class=\"numeric\">Files <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 5, 'number')\" class=\"numeric\">Functions <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 6, 'number')\" class=\"numeric\">Combined <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 7, 'number')\" class=\"numeric\">Long <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 8, 'number')\" class=\"numeric\">Complex <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 9, 'number')\" class=\"numeric\">Max CC <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 10, 'number')\" class=\"numeric\">Max Lines <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("</tr></thead>");
         sb.AppendLine("<tbody>");
 
@@ -420,6 +435,9 @@ tr:hover { background: var(--bg-tertiary); }
             sb.AppendLine("<tr>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{rank}\">{rank}</td>");
             sb.AppendLine($"  <td class=\"mono\">{repoCell}</td>");
+            var lcClass = GetLifecycleCssClass(r.Lifecycle);
+            var lcDisplay = Encode(r.Lifecycle ?? "-");
+            sb.AppendLine($"  <td class=\"{lcClass}\">{lcDisplay}</td>");
             sb.AppendLine($"  <td class=\"numeric {scoreSeverity}\" data-v=\"{r.ConcernScore}\">{r.ConcernScore}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.FileCount}\">{r.FileCount}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.FunctionCount}\">{r.FunctionCount}</td>");
@@ -462,7 +480,7 @@ tr:hover { background: var(--bg-tertiary); }
             }
 
             sb.AppendLine($"<div class=\"repo-detail-section\" id=\"repo-{Encode(anchor)}\">");
-            sb.AppendLine($"<h3>{repoLabel} <span class=\"count-badge {scoreSeverity}\">score: {repo.ConcernScore}</span></h3>");
+            sb.AppendLine($"<h3>{repoLabel} <span class=\"count-badge {scoreSeverity}\" title=\"Weighted sum: 10 pts per combined-risk function, 3 pts per complex-only, 2 pts per long-only, plus bonuses for extreme values.\">score: {repo.ConcernScore}</span></h3>");
             sb.AppendLine($"<p class=\"subtitle\">{repo.FunctionCount:N0} functions across {repo.FileCount:N0} files &nbsp;|&nbsp; " +
                           $"Combined: {repo.CombinedCount} &nbsp;|&nbsp; Long: {repo.LongCount} &nbsp;|&nbsp; Complex: {repo.ComplexCount}</p>");
 
@@ -577,6 +595,7 @@ tr:hover { background: var(--bg-tertiary); }
     private string GetJavaScript() => @"
 function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('sentinel-reports-theme', theme); } catch(e) {}
     var sel = document.getElementById('theme-select');
     if (sel) sel.value = theme;
 }
@@ -586,6 +605,11 @@ function setTheme(theme) {
     var sel = document.getElementById('theme-select');
     if (sel) sel.value = theme;
 })();
+
+window.addEventListener('pageshow', function(e) {
+    var t = localStorage.getItem('sentinel-reports-theme');
+    if (t) setTheme(t);
+});
 
 const sortState = {};
 
@@ -671,4 +695,13 @@ function filterTable(tableId, query) {
     }
 
     private static string Encode(string text) => HttpUtility.HtmlEncode(text);
+
+    private static string GetLifecycleCssClass(string? lifecycle) => lifecycle switch
+    {
+        "GA" => "lc-ga",
+        "In Development" => "lc-dev",
+        "Public Preview" or "Private Preview" => "lc-preview",
+        "Closing Down" => "lc-closing",
+        _ => ""
+    };
 }

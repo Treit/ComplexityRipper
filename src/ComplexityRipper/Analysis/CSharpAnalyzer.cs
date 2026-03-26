@@ -28,7 +28,9 @@ public class CSharpAnalyzer
 
         Parallel.ForEach(repoDirs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, repoDir =>
         {
-            var repoName = Path.GetFileName(repoDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var repoName = Path.GetRelativePath(rootPath, repoDir)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Replace(Path.DirectorySeparatorChar, '/');
 
             if (!PassesFilter(repoName, includeFilter, excludeFilter))
             {
@@ -108,7 +110,8 @@ public class CSharpAnalyzer
     /// <summary>
     /// Determines whether rootPath is itself a git repo or a directory containing multiple repos.
     /// If rootPath contains a .git directory, it is treated as a single repo.
-    /// Otherwise, each subdirectory is treated as a separate repo.
+    /// Otherwise, each subdirectory that is a git repo is included. Subdirectories that are not
+    /// git repos are treated as organizational folders and their children are checked for repos.
     /// </summary>
     private static List<string> ResolveRepoDirs(string rootPath)
     {
@@ -117,9 +120,33 @@ public class CSharpAnalyzer
             return [rootPath];
         }
 
-        return Directory.GetDirectories(rootPath)
-            .Where(d => !Path.GetFileName(d).StartsWith('.'))
-            .ToList();
+        var result = new List<string>();
+
+        foreach (var dir in Directory.GetDirectories(rootPath))
+        {
+            if (Path.GetFileName(dir).StartsWith('.'))
+            {
+                continue;
+            }
+
+            if (Directory.Exists(Path.Combine(dir, ".git")))
+            {
+                result.Add(dir);
+            }
+            else
+            {
+                foreach (var subDir in Directory.GetDirectories(dir))
+                {
+                    if (!Path.GetFileName(subDir).StartsWith('.') &&
+                        Directory.Exists(Path.Combine(subDir, ".git")))
+                    {
+                        result.Add(subDir);
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
     internal static bool PassesFilter(string filePath, Regex? includeFilter, Regex? excludeFilter)
