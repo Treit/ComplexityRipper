@@ -59,7 +59,7 @@ jobs:
         dotnet pack src/ComplexityRipper/ComplexityRipper.csproj --no-build --configuration Release --output ./packages
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ steps.version.outputs.VERSION }}
         name: Release v${{ steps.version.outputs.VERSION }}
