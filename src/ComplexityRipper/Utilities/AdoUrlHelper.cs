@@ -73,10 +73,10 @@ public static class AdoUrlHelper
             string output = process.StandardOutput.ReadToEnd().Trim();
             process.WaitForExit(5000);
 
-            // Output: refs/remotes/origin/main
             if (!string.IsNullOrEmpty(output))
             {
-                return output.Split('/').Last();
+                var lastSlash = output.LastIndexOf('/');
+                return lastSlash >= 0 ? output[(lastSlash + 1)..] : output;
             }
         }
         catch
@@ -103,7 +103,7 @@ public static class AdoUrlHelper
             }
 
             var urlAndSuffix = tabParts[1];
-            if (!urlAndSuffix.Contains("(fetch)"))
+            if (!urlAndSuffix.Contains("(fetch)", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -114,7 +114,7 @@ public static class AdoUrlHelper
 
             // ADO HTTPS: https://msdata@dev.azure.com/msdata/Sentinel%20Graph/_git/NEXT
             // Legacy:   https://msdata.visualstudio.com/DefaultCollection/Sentinel%20Graph/_git/PerfBenchInfra
-            if ((urlPart.Contains("dev.azure.com") || urlPart.Contains("visualstudio.com")) && urlPart.Contains("/_git/"))
+            if ((urlPart.Contains("dev.azure.com", StringComparison.Ordinal) || urlPart.Contains("visualstudio.com", StringComparison.Ordinal)) && urlPart.Contains("/_git/", StringComparison.Ordinal))
             {
                 var uri = new Uri(urlPart.Replace(" ", "%20"));
                 var segments = uri.AbsolutePath.Trim('/').Split('/');
@@ -131,7 +131,7 @@ public static class AdoUrlHelper
                     string org;
                     string project;
 
-                    if (urlPart.Contains("dev.azure.com"))
+                    if (urlPart.Contains("dev.azure.com", StringComparison.Ordinal))
                     {
                         org = segments[0];
                         project = Uri.EscapeDataString(Uri.UnescapeDataString(
@@ -139,14 +139,23 @@ public static class AdoUrlHelper
                     }
                     else
                     {
-                        // visualstudio.com: org is the subdomain (e.g., msdata.visualstudio.com -> msdata)
                         org = uri.Host.Split('.')[0];
-                        // Project is everything between DefaultCollection (or first segment) and _git
-                        var projectSegments = segments.TakeWhile(s => s != "_git")
-                            .Where(s => !s.Equals("DefaultCollection", StringComparison.OrdinalIgnoreCase))
-                            .ToArray();
+                        var projectParts = new List<string>();
+                        foreach (var s in segments)
+                        {
+                            if (s == "_git")
+                            {
+                                break;
+                            }
+
+                            if (!s.Equals("DefaultCollection", StringComparison.OrdinalIgnoreCase))
+                            {
+                                projectParts.Add(s);
+                            }
+                        }
+
                         project = Uri.EscapeDataString(Uri.UnescapeDataString(
-                            string.Join("/", projectSegments)));
+                            string.Join("/", projectParts)));
                     }
 
                     return $"https://dev.azure.com/{org}/{project}/_git/{repo}";
@@ -154,7 +163,7 @@ public static class AdoUrlHelper
             }
 
             // ADO SSH: git@ssh.dev.azure.com:v3/{org}/{project}/{repo}
-            if (urlPart.Contains("ssh.dev.azure.com"))
+            if (urlPart.Contains("ssh.dev.azure.com", StringComparison.Ordinal))
             {
                 var parts = urlPart.Split(':');
                 if (parts.Length >= 2)
@@ -165,7 +174,7 @@ public static class AdoUrlHelper
                         var org = pathParts[1];
                         var project = Uri.EscapeDataString(pathParts[2]);
                         var repo = pathParts[3].Split([' ', '\t'])[0];
-                        if (repo.EndsWith(".git"))
+                        if (repo.EndsWith(".git", StringComparison.Ordinal))
                         {
                             repo = repo[..^4];
                         }
@@ -176,10 +185,10 @@ public static class AdoUrlHelper
             }
 
             // GitHub HTTPS: https://github.com/{owner}/{repo}.git
-            if (urlPart.Contains("github.com"))
+            if (urlPart.Contains("github.com", StringComparison.Ordinal))
             {
                 var cleaned = urlPart.TrimEnd('/');
-                if (cleaned.EndsWith(".git"))
+                if (cleaned.EndsWith(".git", StringComparison.Ordinal))
                 {
                     cleaned = cleaned[..^4];
                 }
@@ -200,10 +209,10 @@ public static class AdoUrlHelper
             }
 
             // GitHub SSH: git@github.com:{owner}/{repo}.git
-            if (urlPart.StartsWith("git@github.com:"))
+            if (urlPart.StartsWith("git@github.com:", StringComparison.Ordinal))
             {
                 var path = urlPart["git@github.com:".Length..];
-                if (path.EndsWith(".git"))
+                if (path.EndsWith(".git", StringComparison.Ordinal))
                 {
                     path = path[..^4];
                 }
@@ -229,7 +238,7 @@ public static class AdoUrlHelper
     /// <summary>
     /// Returns true if the base URL is a GitHub URL.
     /// </summary>
-    public static bool IsGitHub(string baseUrl) => baseUrl.Contains("github.com");
+    public static bool IsGitHub(string baseUrl) => baseUrl.Contains("github.com", StringComparison.Ordinal);
 
     /// <summary>
     /// Builds a URL to a specific file and line range, supporting both ADO and GitHub.

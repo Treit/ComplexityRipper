@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace ComplexityRipper.Models;
 
-public class FunctionMetrics
+public sealed class FunctionMetrics
 {
     [JsonPropertyName("file")]
     public string File { get; set; } = string.Empty;
