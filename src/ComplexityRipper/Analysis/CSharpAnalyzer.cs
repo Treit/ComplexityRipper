@@ -1,7 +1,9 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using ComplexityRipper.Models;
 
 namespace ComplexityRipper.Analysis;
@@ -9,7 +11,7 @@ namespace ComplexityRipper.Analysis;
 /// <summary>
 /// Analyzes C# source files using Roslyn to extract function-level metrics.
 /// </summary>
-public class CSharpAnalyzer
+public sealed class CSharpAnalyzer
 {
     /// <summary>
     /// Analyzes all .cs files under the given repo directories, running in parallel for performance.
@@ -187,8 +189,9 @@ public class CSharpAnalyzer
 
         try
         {
-            var code = File.ReadAllText(filePath);
-            var tree = CSharpSyntaxTree.ParseText(code, path: filePath);
+            using var stream = File.OpenRead(filePath);
+            var sourceText = SourceText.From(stream, Encoding.UTF8);
+            var tree = CSharpSyntaxTree.ParseText(sourceText, path: filePath);
             var root = tree.GetRoot();
 
             var relativePath = Path.GetRelativePath(repoRoot, filePath);

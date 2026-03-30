@@ -9,7 +9,7 @@ namespace ComplexityRipper.Report;
 /// Generates a self-contained HTML report from analysis results.
 /// Matches the dark GitHub-like theme of the existing build health report.
 /// </summary>
-public class HtmlReportGenerator
+public sealed class HtmlReportGenerator
 {
     public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 25, string theme = "light")
     {

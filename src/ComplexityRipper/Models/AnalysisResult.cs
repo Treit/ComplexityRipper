@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace ComplexityRipper.Models;
 
-public class AnalysisResult
+public sealed class AnalysisResult
 {
     [JsonPropertyName("metadata")]
     public AnalysisMetadata Metadata { get; set; } = new();
@@ -17,7 +17,7 @@ public class AnalysisResult
     public List<FunctionMetrics> Functions { get; set; } = new();
 }
 
-public class AnalysisMetadata
+public sealed class AnalysisMetadata
 {
     [JsonPropertyName("generatedAt")]
     public DateTimeOffset GeneratedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -29,7 +29,7 @@ public class AnalysisMetadata
     public Thresholds DefaultThresholds { get; set; } = new();
 }
 
-public class Thresholds
+public sealed class Thresholds
 {
     [JsonPropertyName("maxLines")]
     public int MaxLines { get; set; } = 200;
@@ -38,7 +38,7 @@ public class Thresholds
     public int MaxComplexity { get; set; } = 25;
 }
 
-public class RepoInfo
+public sealed class RepoInfo
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
@@ -59,7 +59,7 @@ public class RepoInfo
     public int FunctionCount { get; set; }
 }
 
-public class AnalysisSummary
+public sealed class AnalysisSummary
 {
     [JsonPropertyName("totalRepos")]
     public int TotalRepos { get; set; }
@@ -74,7 +74,7 @@ public class AnalysisSummary
     public Dictionary<string, LanguageStats> LanguageBreakdown { get; set; } = new();
 }
 
-public class LanguageStats
+public sealed class LanguageStats
 {
     [JsonPropertyName("files")]
     public int Files { get; set; }
