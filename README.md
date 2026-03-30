@@ -13,7 +13,7 @@ dotnet tool install -g ComplexityRipper
 
 ## Quick Start
 
-Scan a directory of repos and generate an HTML report with default thresholds (200 lines, 15 complexity):
+Scan a directory of repos and generate an HTML report with default thresholds (200 lines, 25 complexity):
 
 ```powershell
 complexityripper run --root C:\src\my-repos
@@ -78,7 +78,7 @@ complexityripper analyze --root C:\src\my-repos --output stats.json
 ### Generate report from existing JSON
 
 ```powershell
-complexityripper report --input stats.json --output report.html --threshold-lines 200 --threshold-complexity 15
+complexityripper report --input stats.json --output report.html --threshold-lines 200 --threshold-complexity 25
 ```
 
 ## Commands
@@ -99,10 +99,12 @@ complexityripper report --input stats.json --output report.html --threshold-line
 | `--output` | `code-complexity-report.html` | Output HTML report file path |
 | `--stats` | `stats.json` | Intermediate stats JSON file path |
 | `--threshold-lines` | `200` | Line count threshold for flagging functions |
-| `--threshold-complexity` | `15` | Cyclomatic complexity threshold |
+| `--threshold-complexity` | `25` | Cyclomatic complexity threshold |
 | `--theme` | `light` | Report theme: light, dark, high-contrast, ink |
 | `--include` | | Regex to include repos (use \| for OR) |
 | `--exclude` | | Regex to exclude repos (use \| for OR) |
+| `--include-tests` | `false` | Include test projects (excluded by default) |
+| `--repo-metadata` | | Path to repo-metadata.json for lifecycle tags |
 
 ### `analyze`
 
@@ -112,6 +114,7 @@ complexityripper report --input stats.json --output report.html --threshold-line
 | `--output` | `stats.json` | Output JSON file path |
 | `--include` | | Regex to include repos (use \| for OR) |
 | `--exclude` | | Regex to exclude repos (use \| for OR) |
+| `--include-tests` | `false` | Include test projects (excluded by default) |
 
 ### `report`
 
@@ -120,7 +123,9 @@ complexityripper report --input stats.json --output report.html --threshold-line
 | `--input` | `stats.json` | Input JSON file path (from a previous `analyze` or `run`) |
 | `--output` | `code-complexity-report.html` | Output HTML file path |
 | `--threshold-lines` | `200` | Line count threshold for flagging functions |
-| `--threshold-complexity` | `15` | Cyclomatic complexity threshold |
+| `--threshold-complexity` | `25` | Cyclomatic complexity threshold |
+| `--theme` | `light` | Report theme: light, dark, high-contrast, ink |
+| `--repo-metadata` | | Path to repo-metadata.json for lifecycle tags |
 
 ## How It Works
 
@@ -141,14 +146,9 @@ The HTML report generates clickable hyperlinks for every repo, file, class, and 
 
 The generated report is a self-contained HTML file (inline CSS + JS, no external dependencies) that includes:
 
-**Summary cards** -- total repos, files, functions, flagged counts.
-**Distribution charts** -- function length and complexity histograms.
-**Combined risk table** -- functions exceeding both thresholds (highest refactoring priority).
-**Long functions table** -- sorted by line count.
-**High complexity table** -- sorted by cyclomatic complexity.
-**Per-repo breakdown** -- aggregated stats per repository.
-
-All tables are sortable and filterable.
+**Summary table** -- total repos, files, functions, and flagged counts as a plain numbers breakdown.
+**Repository ranking** -- all repos ranked by a weighted concern score (worst first), sortable and filterable.
+**Per-repository details** -- for each repo with flagged functions: distribution bar charts for function length and complexity, followed by combined risk, long functions, and high complexity tables. All tables are sortable and filterable.
 
 ## Metrics
 

@@ -32,7 +32,7 @@ public class HtmlReportGenerator
         AppendHead(sb, theme);
         sb.AppendLine("<body>");
         AppendHeader(sb, data, thresholdLines, thresholdComplexity);
-        AppendSummaryCards(sb, data, totalLong, totalComplex, totalCombined);
+        AppendSummaryTable(sb, data, totalLong, totalComplex, totalCombined);
         AppendRepoRanking(sb, repoStats, thresholdLines, thresholdComplexity);
         AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity);
         AppendFooter(sb);
@@ -294,7 +294,7 @@ tr:hover { background: var(--bg-tertiary); }
 
 @media (max-width: 768px) {
     .chart-grid { grid-template-columns: 1fr; }
-    .cards { grid-template-columns: repeat(2, 1fr); }
+
     .table-filter { width: 150px; }
 }
 ";
@@ -317,7 +317,7 @@ tr:hover { background: var(--bg-tertiary); }
                        $"Root: {Encode(data.Metadata.RootPath)}</p>");
     }
 
-    private void AppendSummaryCards(StringBuilder sb, AnalysisResult data, int longCount, int complexCount, int combinedCount)
+    private void AppendSummaryTable(StringBuilder sb, AnalysisResult data, int longCount, int complexCount, int combinedCount)
     {
         var longClass = longCount > 100 ? "severity-critical" : longCount > 20 ? "severity-high" : longCount > 0 ? "severity-medium" : "";
         var complexClass = complexCount > 100 ? "severity-critical" : complexCount > 20 ? "severity-high" : complexCount > 0 ? "severity-medium" : "";
