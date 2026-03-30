@@ -274,6 +274,7 @@ public sealed class CSharpAnalyzer
             int lineCount = endLine - startLine + 1;
 
             string? className = null;
+            // Materialize once to avoid re-enumerating the ancestor tree for Reverse/Select.
             var typeAncestors = node.Ancestors().OfType<TypeDeclarationSyntax>().ToList();
             if (typeAncestors.Count > 0)
             {
