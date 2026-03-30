@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ComplexityRipper/ComplexityRipper.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/ComplexityRipper.Tests/ComplexityRipper.Tests.csproj" />
+  </Folder>
+</Solution>
