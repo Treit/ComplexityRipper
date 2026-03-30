@@ -19,7 +19,7 @@ public class HtmlReportGenerator
 
         var repoStats = data.Functions
             .GroupBy(f => f.Repo)
-            .Select(g => BuildRepoStats(g.Key, g.ToList(), repoLookup, thresholdLines, thresholdComplexity))
+            .Select(g => BuildRepoStats(g.Key, g, repoLookup, thresholdLines, thresholdComplexity))
             .OrderByDescending(r => r.ConcernScore)
             .ToList();
 
@@ -63,11 +63,12 @@ public class HtmlReportGenerator
 
     private static RepoStatsRow BuildRepoStats(
         string repoName,
-        List<FunctionMetrics> functions,
+        IEnumerable<FunctionMetrics> functionsEnumerable,
         Dictionary<string, RepoInfo> repoLookup,
         int thresholdLines,
         int thresholdComplexity)
     {
+        var functions = functionsEnumerable.ToList();
         repoLookup.TryGetValue(repoName, out var info);
 
         var longFuncs = functions.Where(f => f.LineCount >= thresholdLines).OrderByDescending(f => f.LineCount).ToList();
@@ -524,14 +525,14 @@ tr:hover { background: var(--bg-tertiary); }
 
         sb.AppendLine($"<table id=\"{tableId}\">");
         sb.AppendLine("<thead><tr>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 0, 'string')\">Project <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 1, 'string')\">File <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 2, 'string')\">Class <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 3, 'string')\">Function <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 4, 'number')\" class=\"numeric\">Lines <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 5, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 6, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('" + tableId + "', 7, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 0, 'string')\">Project <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 1, 'string')\">File <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 2, 'string')\">Class <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 3, 'string')\">Function <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 4, 'number')\" class=\"numeric\">Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 5, 'number')\" class=\"numeric\">Complexity <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 6, 'number')\" class=\"numeric\">Params <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('{tableId}', 7, 'number')\" class=\"numeric\">Nesting <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("</tr></thead>");
         sb.AppendLine("<tbody>");
 
@@ -685,13 +686,29 @@ function filterTable(tableId, query) {
 
     private static string GetShortFileName(string path)
     {
-        var parts = path.Replace('\\', '/').Split('/');
-        if (parts.Length <= 2)
+        var normalized = path.AsSpan();
+        int separatorCount = 0;
+        int secondLastSep = -1;
+
+        for (int i = normalized.Length - 1; i >= 0; i--)
+        {
+            if (normalized[i] == '/' || normalized[i] == '\\')
+            {
+                separatorCount++;
+                if (separatorCount == 2)
+                {
+                    secondLastSep = i;
+                    break;
+                }
+            }
+        }
+
+        if (secondLastSep < 0)
         {
             return path;
         }
 
-        return ".../" + string.Join("/", parts[^2..]);
+        return $".../{path[(secondLastSep + 1)..].Replace('\\', '/')}";
     }
 
     private static string Encode(string text) => HttpUtility.HtmlEncode(text);

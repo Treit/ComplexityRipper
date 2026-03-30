@@ -45,10 +45,10 @@ public class CSharpAnalyzer
                 ? Utilities.AdoUrlHelper.GetDefaultBranch(repoDir)
                 : "main";
 
+            var objSegment = $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}";
+            var binSegment = $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}";
             var csFiles = Directory.EnumerateFiles(repoDir, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                         && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-                .ToList();
+                .Where(f => !f.Contains(objSegment) && !f.Contains(binSegment));
 
             int functionCount = 0;
             int fileCount = 0;
@@ -270,16 +270,12 @@ public class CSharpAnalyzer
             int endLine = lineSpan.EndLinePosition.Line + 1;
             int lineCount = endLine - startLine + 1;
 
-            // Find containing class/struct/record
             string? className = null;
-            var typeDecl = node.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
-            if (typeDecl != null)
+            var typeAncestors = node.Ancestors().OfType<TypeDeclarationSyntax>().ToList();
+            if (typeAncestors.Count > 0)
             {
-                // Include nested type names
-                var typeNames = node.Ancestors().OfType<TypeDeclarationSyntax>()
-                    .Reverse()
-                    .Select(t => t.Identifier.Text);
-                className = string.Join(".", typeNames);
+                typeAncestors.Reverse();
+                className = string.Join(".", typeAncestors.Select(t => t.Identifier.Text));
             }
 
             // Find containing namespace
@@ -318,7 +314,7 @@ public class CSharpAnalyzer
 /// </summary>
 internal class ProjectResolver
 {
-    private static readonly string[] ProjectExtensions = ["*.csproj", "*.fsproj", "*.vbproj"];
+    private static readonly string[] ProjectExtensions = [".csproj", ".fsproj", ".vbproj"];
     private readonly string _repoRoot;
     private readonly Dictionary<string, string?> _cache = new(StringComparer.OrdinalIgnoreCase);
 
@@ -344,10 +340,9 @@ internal class ProjectResolver
 
             foreach (var pattern in ProjectExtensions)
             {
-                var projFiles = Directory.GetFiles(dir, pattern);
-                if (projFiles.Length > 0)
+                foreach (var file in Directory.EnumerateFiles(dir, "*" + pattern))
                 {
-                    var name = Path.GetFileNameWithoutExtension(projFiles[0]);
+                    var name = Path.GetFileNameWithoutExtension(file);
                     CacheUpTo(Path.GetDirectoryName(Path.GetFullPath(sourceFilePath))!, dir, name);
                     return name;
                 }

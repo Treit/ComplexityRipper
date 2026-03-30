@@ -73,10 +73,10 @@ public static class AdoUrlHelper
             string output = process.StandardOutput.ReadToEnd().Trim();
             process.WaitForExit(5000);
 
-            // Output: refs/remotes/origin/main
             if (!string.IsNullOrEmpty(output))
             {
-                return output.Split('/').Last();
+                var lastSlash = output.LastIndexOf('/');
+                return lastSlash >= 0 ? output[(lastSlash + 1)..] : output;
             }
         }
         catch
@@ -139,14 +139,23 @@ public static class AdoUrlHelper
                     }
                     else
                     {
-                        // visualstudio.com: org is the subdomain (e.g., msdata.visualstudio.com -> msdata)
                         org = uri.Host.Split('.')[0];
-                        // Project is everything between DefaultCollection (or first segment) and _git
-                        var projectSegments = segments.TakeWhile(s => s != "_git")
-                            .Where(s => !s.Equals("DefaultCollection", StringComparison.OrdinalIgnoreCase))
-                            .ToArray();
+                        var projectParts = new List<string>();
+                        foreach (var s in segments)
+                        {
+                            if (s == "_git")
+                            {
+                                break;
+                            }
+
+                            if (!s.Equals("DefaultCollection", StringComparison.OrdinalIgnoreCase))
+                            {
+                                projectParts.Add(s);
+                            }
+                        }
+
                         project = Uri.EscapeDataString(Uri.UnescapeDataString(
-                            string.Join("/", projectSegments)));
+                            string.Join("/", projectParts)));
                     }
 
                     return $"https://dev.azure.com/{org}/{project}/_git/{repo}";
