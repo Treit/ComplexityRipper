@@ -315,12 +315,15 @@ public sealed class CSharpAnalyzer
 /// <summary>
 /// Resolves the nearest .NET project file for a given source file by walking up
 /// the directory tree. Caches results per directory to avoid redundant I/O.
+/// When no ancestor project is found, falls back to the project whose directory
+/// shares the deepest common ancestor with the source file.
 /// </summary>
 internal class ProjectResolver
 {
     private static readonly string[] ProjectExtensions = [".csproj", ".fsproj", ".vbproj"];
     private readonly string _repoRoot;
     private readonly Dictionary<string, string?> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private List<(string Dir, string Name)>? _allProjects;
 
     public ProjectResolver(string repoRoot)
     {
@@ -335,27 +338,136 @@ internal class ProjectResolver
             return null;
         }
 
-        while (dir != null && dir.StartsWith(_repoRoot, StringComparison.OrdinalIgnoreCase))
+        var result = FindByAncestorWalk(dir, sourceFilePath);
+        if (result != null)
         {
-            if (_cache.TryGetValue(dir, out var cached))
+            return result;
+        }
+
+        return FindByNearestProject(dir);
+    }
+
+    private string? FindByAncestorWalk(string dir, string sourceFilePath)
+    {
+        var current = dir;
+        while (current != null && current.StartsWith(_repoRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_cache.TryGetValue(current, out var cached))
             {
                 return cached;
             }
 
             foreach (var pattern in ProjectExtensions)
             {
-                foreach (var file in Directory.EnumerateFiles(dir, "*" + pattern))
+                foreach (var file in Directory.EnumerateFiles(current, "*" + pattern))
                 {
                     var name = Path.GetFileNameWithoutExtension(file);
-                    CacheUpTo(Path.GetDirectoryName(Path.GetFullPath(sourceFilePath))!, dir, name);
+                    CacheUpTo(dir, current, name);
                     return name;
                 }
             }
 
-            dir = Path.GetDirectoryName(dir);
+            current = Path.GetDirectoryName(current);
         }
 
         return null;
+    }
+
+    private string? FindByNearestProject(string sourceDir)
+    {
+        _allProjects ??= ScanAllProjects();
+
+        if (_allProjects.Count == 0)
+        {
+            return null;
+        }
+
+        string? bestName = null;
+        int bestCommonLength = -1;
+
+        foreach (var (projDir, projName) in _allProjects)
+        {
+            int commonLen = GetCommonPrefixLength(sourceDir, projDir);
+            if (commonLen > bestCommonLength)
+            {
+                bestCommonLength = commonLen;
+                bestName = projName;
+            }
+        }
+
+        if (bestName != null)
+        {
+            _cache[sourceDir] = bestName;
+        }
+
+        return bestName;
+    }
+
+    private List<(string Dir, string Name)> ScanAllProjects()
+    {
+        var projects = new List<(string Dir, string Name)>();
+        foreach (var ext in ProjectExtensions)
+        {
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(_repoRoot, "*" + ext, SearchOption.AllDirectories))
+                {
+                    var dir = Path.GetDirectoryName(file);
+                    if (dir != null)
+                    {
+                        projects.Add((dir, Path.GetFileNameWithoutExtension(file)));
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            catch (DirectoryNotFoundException)
+            {
+            }
+        }
+
+        return projects;
+    }
+
+    internal static int GetCommonPrefixLength(string pathA, string pathB)
+    {
+        int limit = Math.Min(pathA.Length, pathB.Length);
+        int lastSep = -1;
+        int matched = 0;
+
+        for (int i = 0; i < limit; i++)
+        {
+            char a = pathA[i];
+            char b = pathB[i];
+            if (char.ToUpperInvariant(a) != char.ToUpperInvariant(b))
+            {
+                break;
+            }
+
+            matched = i + 1;
+
+            if (a == Path.DirectorySeparatorChar || a == Path.AltDirectorySeparatorChar)
+            {
+                lastSep = i;
+            }
+        }
+
+        if (matched == limit)
+        {
+            if (pathA.Length == pathB.Length)
+            {
+                return limit;
+            }
+
+            var longer = pathA.Length > pathB.Length ? pathA : pathB;
+            if (longer[limit] == Path.DirectorySeparatorChar || longer[limit] == Path.AltDirectorySeparatorChar)
+            {
+                return limit;
+            }
+        }
+
+        return lastSep;
     }
 
     private void CacheUpTo(string fromDir, string toDir, string? projectName)

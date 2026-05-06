@@ -325,6 +325,101 @@ class C
         }
     }
 
+    [Fact]
+    public void ProjectResolver_FallsBackToNearestProject()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"test_projres_{Guid.NewGuid():N}");
+
+        try
+        {
+            var projDir = Path.Combine(root, "src", "MyProject");
+            Directory.CreateDirectory(projDir);
+            File.WriteAllText(Path.Combine(projDir, "MyProject.csproj"), "<Project />");
+
+            var looseDir = Path.Combine(root, "src", "Common", "Helpers");
+            Directory.CreateDirectory(looseDir);
+            var looseFile = Path.Combine(looseDir, "Helper.cs");
+            File.WriteAllText(looseFile, "class H {}");
+
+            var resolver = new ProjectResolver(root);
+            var result = resolver.GetProjectName(looseFile);
+
+            Assert.Equal("MyProject", result);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void ProjectResolver_AncestorWalkStillWorks()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"test_projres_anc_{Guid.NewGuid():N}");
+
+        try
+        {
+            var projDir = Path.Combine(root, "src", "MyLib");
+            var subDir = Path.Combine(projDir, "Models");
+            Directory.CreateDirectory(subDir);
+            File.WriteAllText(Path.Combine(projDir, "MyLib.csproj"), "<Project />");
+            var sourceFile = Path.Combine(subDir, "Foo.cs");
+            File.WriteAllText(sourceFile, "class Foo {}");
+
+            var resolver = new ProjectResolver(root);
+            var result = resolver.GetProjectName(sourceFile);
+
+            Assert.Equal("MyLib", result);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void ProjectResolver_NoProjectsReturnsNull()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"test_projres_none_{Guid.NewGuid():N}");
+
+        try
+        {
+            var subDir = Path.Combine(root, "src");
+            Directory.CreateDirectory(subDir);
+            var sourceFile = Path.Combine(subDir, "Orphan.cs");
+            File.WriteAllText(sourceFile, "class O {}");
+
+            var resolver = new ProjectResolver(root);
+            var result = resolver.GetProjectName(sourceFile);
+
+            Assert.Null(result);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void GetCommonPrefixLength_SharedPath()
+    {
+        var sep = Path.DirectorySeparatorChar;
+        int len = ProjectResolver.GetCommonPrefixLength(
+            $"C:{sep}repos{sep}src{sep}Common{sep}Config",
+            $"C:{sep}repos{sep}src{sep}MyProject");
+        Assert.Equal($"C:{sep}repos{sep}src".Length, len);
+    }
+
+    [Fact]
+    public void GetCommonPrefixLength_NoCommonPath()
+    {
+        var sep = Path.DirectorySeparatorChar;
+        int len = ProjectResolver.GetCommonPrefixLength(
+            $"D:{sep}other{sep}path",
+            $"C:{sep}repos{sep}src");
+        Assert.Equal(-1, len);
+    }
+
     private static string WriteTempFile(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.cs");

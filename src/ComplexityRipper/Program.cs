@@ -70,16 +70,18 @@ var inputOption = new Option<string>("--input", () => "stats.json", "Input JSON 
 var reportOutputOption = new Option<string>("--output", () => "code-complexity-report.html", "Output HTML file path");
 var thresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var thresholdComplexityOption = new Option<int>("--threshold-complexity", () => 25, "Cyclomatic complexity threshold for flagging functions");
+var thresholdNestingOption = new Option<int>("--threshold-nesting", () => 4, "Max nesting depth threshold for flagging functions");
 var themeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 var reportMetadataOption = new Option<string?>("--repo-metadata", "Path to repo-metadata.json for lifecycle tags");
 reportCommand.AddOption(inputOption);
 reportCommand.AddOption(reportOutputOption);
 reportCommand.AddOption(thresholdLinesOption);
 reportCommand.AddOption(thresholdComplexityOption);
+reportCommand.AddOption(thresholdNestingOption);
 reportCommand.AddOption(themeOption);
 reportCommand.AddOption(reportMetadataOption);
 
-reportCommand.SetHandler(async (string input, string output, int thresholdLines, int thresholdComplexity, string theme, string? repoMetadataPath) =>
+reportCommand.SetHandler(async (string input, string output, int thresholdLines, int thresholdComplexity, int thresholdNesting, string theme, string? repoMetadataPath) =>
 {
     if (!File.Exists(input))
     {
@@ -88,7 +90,7 @@ reportCommand.SetHandler(async (string input, string output, int thresholdLines,
     }
 
     Console.WriteLine($"Generating report from: {input}");
-    Console.WriteLine($"Thresholds: {thresholdLines} lines, {thresholdComplexity} complexity");
+    Console.WriteLine($"Thresholds: {thresholdLines} lines, {thresholdComplexity} complexity, {thresholdNesting} nesting");
 
     var json = await File.ReadAllTextAsync(input);
     var data = JsonSerializer.Deserialize<AnalysisResult>(json, jsonOptions);
@@ -101,10 +103,10 @@ reportCommand.SetHandler(async (string input, string output, int thresholdLines,
     ApplyRepoMetadata(data, repoMetadataPath);
 
     var reportGenerator = new HtmlReportGenerator();
-    reportGenerator.Generate(data, output, thresholdLines, thresholdComplexity, theme);
+    reportGenerator.Generate(data, output, thresholdLines, thresholdComplexity, theme, thresholdNesting);
     Console.WriteLine($"Report written to: {output}");
 
-}, inputOption, reportOutputOption, thresholdLinesOption, thresholdComplexityOption, themeOption, reportMetadataOption);
+}, inputOption, reportOutputOption, thresholdLinesOption, thresholdComplexityOption, thresholdNestingOption, themeOption, reportMetadataOption);
 
 // run command — analyze + report in one step
 var runCommand = new Command("run", "Analyze repos and generate report in one step");
@@ -113,6 +115,7 @@ var runOutputOption = new Option<string>("--output", () => "code-complexity-repo
 var runStatsOption = new Option<string>("--stats", () => "stats.json", "Intermediate stats JSON file path");
 var runThresholdLinesOption = new Option<int>("--threshold-lines", () => 200, "Line count threshold for flagging functions");
 var runThresholdComplexityOption = new Option<int>("--threshold-complexity", () => 25, "Cyclomatic complexity threshold for flagging functions");
+var runThresholdNestingOption = new Option<int>("--threshold-nesting", () => 4, "Max nesting depth threshold for flagging functions");
 var runThemeOption = new Option<string>("--theme", () => "light", "Report theme: light, dark, high-contrast, ink");
 var runIncludeOption = new Option<string?>("--include", "Regex to include repos (use | for OR). Only matching repo names are analyzed");
 var runExcludeOption = new Option<string?>("--exclude", "Regex to exclude repos (use | for OR). Matching repo names are skipped");
@@ -123,6 +126,7 @@ runCommand.AddOption(runOutputOption);
 runCommand.AddOption(runStatsOption);
 runCommand.AddOption(runThresholdLinesOption);
 runCommand.AddOption(runThresholdComplexityOption);
+runCommand.AddOption(runThresholdNestingOption);
 runCommand.AddOption(runThemeOption);
 runCommand.AddOption(runIncludeOption);
 runCommand.AddOption(runExcludeOption);
@@ -136,6 +140,7 @@ runCommand.SetHandler(async (InvocationContext ctx) =>
     var statsPath = ctx.ParseResult.GetValueForOption(runStatsOption)!;
     var thresholdLines = ctx.ParseResult.GetValueForOption(runThresholdLinesOption);
     var thresholdComplexity = ctx.ParseResult.GetValueForOption(runThresholdComplexityOption);
+    var thresholdNesting = ctx.ParseResult.GetValueForOption(runThresholdNestingOption);
     var theme = ctx.ParseResult.GetValueForOption(runThemeOption)!;
     var include = ctx.ParseResult.GetValueForOption(runIncludeOption);
     var exclude = ctx.ParseResult.GetValueForOption(runExcludeOption);
@@ -176,7 +181,7 @@ runCommand.SetHandler(async (InvocationContext ctx) =>
     ApplyRepoMetadata(result, repoMetadataPath);
 
     var reportGenerator = new HtmlReportGenerator();
-    reportGenerator.Generate(result, output, thresholdLines, thresholdComplexity, theme);
+    reportGenerator.Generate(result, output, thresholdLines, thresholdComplexity, theme, thresholdNesting);
     Console.WriteLine($"Report written to: {output}");
 
     sw.Stop();

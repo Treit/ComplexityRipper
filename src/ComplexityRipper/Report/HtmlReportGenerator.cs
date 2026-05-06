@@ -11,7 +11,7 @@ namespace ComplexityRipper.Report;
 /// </summary>
 public sealed class HtmlReportGenerator
 {
-    public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 25, string theme = "light")
+    public void Generate(AnalysisResult data, string outputPath, int thresholdLines = 200, int thresholdComplexity = 25, string theme = "light", int thresholdNesting = 4)
     {
         var sb = new StringBuilder();
 
@@ -19,22 +19,23 @@ public sealed class HtmlReportGenerator
 
         var repoStats = data.Functions
             .GroupBy(f => f.Repo)
-            .Select(g => BuildRepoStats(g.Key, g, repoLookup, thresholdLines, thresholdComplexity))
+            .Select(g => BuildRepoStats(g.Key, g, repoLookup, thresholdLines, thresholdComplexity, thresholdNesting))
             .OrderByDescending(r => r.ConcernScore)
             .ToList();
 
         int totalLong = repoStats.Sum(r => r.LongCount);
         int totalComplex = repoStats.Sum(r => r.ComplexCount);
         int totalCombined = repoStats.Sum(r => r.CombinedCount);
+        int totalNested = repoStats.Sum(r => r.NestedCount);
 
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html lang=\"en\">");
         AppendHead(sb, theme);
         sb.AppendLine("<body>");
-        AppendHeader(sb, data, thresholdLines, thresholdComplexity);
-        AppendSummaryTable(sb, data, totalLong, totalComplex, totalCombined);
-        AppendRepoRanking(sb, repoStats, thresholdLines, thresholdComplexity);
-        AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity);
+        AppendHeader(sb, data, thresholdLines, thresholdComplexity, thresholdNesting);
+        AppendSummaryTable(sb, data, totalLong, totalComplex, totalCombined, totalNested);
+        AppendRepoRanking(sb, repoStats, thresholdLines, thresholdComplexity, thresholdNesting);
+        AppendPerRepoDetails(sb, repoStats, repoLookup, thresholdLines, thresholdComplexity, thresholdNesting);
         AppendFooter(sb);
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
@@ -52,21 +53,25 @@ public sealed class HtmlReportGenerator
         int LongCount,
         int ComplexCount,
         int CombinedCount,
+        int NestedCount,
         double AvgComplexity,
         int MaxComplexity,
         int MaxLines,
+        int MaxNesting,
         int ConcernScore,
         List<FunctionMetrics> All,
         List<FunctionMetrics> Long,
         List<FunctionMetrics> Complex,
-        List<FunctionMetrics> Combined);
+        List<FunctionMetrics> Combined,
+        List<FunctionMetrics> Nested);
 
     private static RepoStatsRow BuildRepoStats(
         string repoName,
         IEnumerable<FunctionMetrics> functionsEnumerable,
         Dictionary<string, RepoInfo> repoLookup,
         int thresholdLines,
-        int thresholdComplexity)
+        int thresholdComplexity,
+        int thresholdNesting)
     {
         var functions = functionsEnumerable.ToList();
         repoLookup.TryGetValue(repoName, out var info);
@@ -75,15 +80,18 @@ public sealed class HtmlReportGenerator
         var complexFuncs = functions.Where(f => f.CyclomaticComplexity >= thresholdComplexity).OrderByDescending(f => f.CyclomaticComplexity).ToList();
         var combinedFuncs = functions.Where(f => f.LineCount >= thresholdLines && f.CyclomaticComplexity >= thresholdComplexity)
             .OrderByDescending(f => f.CyclomaticComplexity * f.LineCount).ToList();
+        var nestedFuncs = functions.Where(f => f.MaxNestingDepth >= thresholdNesting).OrderByDescending(f => f.MaxNestingDepth).ToList();
 
         // Concern score: weighted sum of flagged functions
         // Combined risk (both thresholds) = 10 points each
         // Complex only = 3 points each
         // Long only = 2 points each
+        // Deeply nested = 3 points each
         // Extra points for extreme values
         int score = combinedFuncs.Count * 10
             + (complexFuncs.Count - combinedFuncs.Count) * 3
-            + (longFuncs.Count - combinedFuncs.Count) * 2;
+            + (longFuncs.Count - combinedFuncs.Count) * 2
+            + nestedFuncs.Count * 3;
 
         foreach (var f in functions)
         {
@@ -93,6 +101,11 @@ public sealed class HtmlReportGenerator
             }
 
             if (f.LineCount >= thresholdLines * 2)
+            {
+                score += 3;
+            }
+
+            if (f.MaxNestingDepth >= thresholdNesting * 2)
             {
                 score += 3;
             }
@@ -108,14 +121,17 @@ public sealed class HtmlReportGenerator
             LongCount: longFuncs.Count,
             ComplexCount: complexFuncs.Count,
             CombinedCount: combinedFuncs.Count,
+            NestedCount: nestedFuncs.Count,
             AvgComplexity: functions.Count > 0 ? functions.Average(f => f.CyclomaticComplexity) : 0,
             MaxComplexity: functions.Count > 0 ? functions.Max(f => f.CyclomaticComplexity) : 0,
             MaxLines: functions.Count > 0 ? functions.Max(f => f.LineCount) : 0,
+            MaxNesting: functions.Count > 0 ? functions.Max(f => f.MaxNestingDepth) : 0,
             ConcernScore: score,
             All: functions,
             Long: longFuncs,
             Complex: complexFuncs,
-            Combined: combinedFuncs);
+            Combined: combinedFuncs,
+            Nested: nestedFuncs);
     }
 
     private void AppendHead(StringBuilder sb, string defaultTheme)
@@ -300,7 +316,7 @@ tr:hover { background: var(--bg-tertiary); }
 }
 ";
 
-    private void AppendHeader(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity)
+    private void AppendHeader(StringBuilder sb, AnalysisResult data, int thresholdLines, int thresholdComplexity, int thresholdNesting)
     {
         sb.AppendLine("<div class=\"container\">");
         sb.AppendLine("<div class=\"theme-switcher\">");
@@ -314,15 +330,16 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</div>");
         sb.AppendLine("<h1>Code Complexity Report</h1>");
         sb.AppendLine($"<p class=\"subtitle\">Generated {data.Metadata.GeneratedAt:yyyy-MM-dd HH:mm:ss UTC} &nbsp;|&nbsp; " +
-                       $"Thresholds: {thresholdLines} lines, {thresholdComplexity} complexity &nbsp;|&nbsp; " +
+                       $"Thresholds: {thresholdLines} lines, {thresholdComplexity} complexity, {thresholdNesting} nesting &nbsp;|&nbsp; " +
                        $"Root: {Encode(data.Metadata.RootPath)}</p>");
     }
 
-    private void AppendSummaryTable(StringBuilder sb, AnalysisResult data, int longCount, int complexCount, int combinedCount)
+    private void AppendSummaryTable(StringBuilder sb, AnalysisResult data, int longCount, int complexCount, int combinedCount, int nestedCount)
     {
         var longClass = longCount > 100 ? "severity-critical" : longCount > 20 ? "severity-high" : longCount > 0 ? "severity-medium" : "";
         var complexClass = complexCount > 100 ? "severity-critical" : complexCount > 20 ? "severity-high" : complexCount > 0 ? "severity-medium" : "";
         var combinedClass = combinedCount > 50 ? "severity-critical" : combinedCount > 10 ? "severity-high" : combinedCount > 0 ? "severity-medium" : "";
+        var nestedClass = nestedCount > 100 ? "severity-critical" : nestedCount > 20 ? "severity-high" : nestedCount > 0 ? "severity-medium" : "";
 
         sb.AppendLine("<table class=\"summary-table\"><tbody>");
         sb.AppendLine($"<tr><td>Repositories</td><td>{data.Summary.TotalRepos:N0}</td></tr>");
@@ -330,6 +347,7 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine($"<tr><td>Functions</td><td>{data.Summary.TotalFunctions:N0}</td></tr>");
         sb.AppendLine($"<tr><td>Long functions</td><td class=\"{longClass}\">{longCount:N0}</td></tr>");
         sb.AppendLine($"<tr><td>Complex functions</td><td class=\"{complexClass}\">{complexCount:N0}</td></tr>");
+        sb.AppendLine($"<tr><td>Deeply nested</td><td class=\"{nestedClass}\">{nestedCount:N0}</td></tr>");
         sb.AppendLine($"<tr><td>Combined risk</td><td class=\"{combinedClass}\">{combinedCount:N0}</td></tr>");
         sb.AppendLine("</tbody></table>");
     }
@@ -398,7 +416,7 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</div>");
     }
 
-    private void AppendRepoRanking(StringBuilder sb, List<RepoStatsRow> repoStats, int thresholdLines, int thresholdComplexity)
+    private void AppendRepoRanking(StringBuilder sb, List<RepoStatsRow> repoStats, int thresholdLines, int thresholdComplexity, int thresholdNesting)
     {
         sb.AppendLine("<h2>Repository Ranking</h2>");
         sb.AppendLine("<div class=\"table-container\">");
@@ -412,14 +430,16 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 0, 'number')\" class=\"numeric\"># <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 1, 'string')\">Repository <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 2, 'string')\">Lifecycle <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine($"<th onclick=\"sortTable('repo-ranking', 3, 'number')\" class=\"numeric\" title=\"Weighted sum: 10 pts per combined-risk function (exceeds both thresholds), 3 pts per complex-only, 2 pts per long-only. Bonus: +5 if complexity &gt;= {thresholdComplexity * 2}, +3 if lines &gt;= {thresholdLines * 2}.\">Concern Score <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('repo-ranking', 3, 'number')\" class=\"numeric\" title=\"Weighted sum: 10 pts per combined-risk function (exceeds both thresholds), 3 pts per complex-only, 2 pts per long-only, 3 pts per deeply nested. Bonus: +5 if complexity &gt;= {thresholdComplexity * 2}, +3 if lines &gt;= {thresholdLines * 2}, +3 if nesting &gt;= {thresholdNesting * 2}.\">Concern Score <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 4, 'number')\" class=\"numeric\">Files <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 5, 'number')\" class=\"numeric\">Functions <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 6, 'number')\" class=\"numeric\">Combined <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 7, 'number')\" class=\"numeric\">Long <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 8, 'number')\" class=\"numeric\">Complex <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 9, 'number')\" class=\"numeric\">Max CC <span class=\"sort-arrow\">⇅</span></th>");
-        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 10, 'number')\" class=\"numeric\">Max Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine($"<th onclick=\"sortTable('repo-ranking', 9, 'number')\" class=\"numeric\" title=\"Functions with nesting depth >= {thresholdNesting}\">Nested <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 10, 'number')\" class=\"numeric\">Max CC <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 11, 'number')\" class=\"numeric\">Max Lines <span class=\"sort-arrow\">⇅</span></th>");
+        sb.AppendLine("<th onclick=\"sortTable('repo-ranking', 12, 'number')\" class=\"numeric\">Max Nesting <span class=\"sort-arrow\">⇅</span></th>");
         sb.AppendLine("</tr></thead>");
         sb.AppendLine("<tbody>");
 
@@ -428,6 +448,7 @@ tr:hover { background: var(--bg-tertiary); }
         {
             var scoreSeverity = r.ConcernScore >= 50 ? "severity-critical" : r.ConcernScore >= 20 ? "severity-high" : r.ConcernScore >= 5 ? "severity-medium" : "severity-ok";
             var combinedSeverity = r.CombinedCount > 5 ? "severity-critical" : r.CombinedCount > 0 ? "severity-high" : "";
+            var nestedSeverity = r.NestedCount > 20 ? "severity-critical" : r.NestedCount > 5 ? "severity-high" : r.NestedCount > 0 ? "severity-medium" : "";
 
             string repoCell = r.ConcernScore > 0
                 ? $"<a href=\"#repo-{Encode(r.Name.Replace(" ", "-"))}\">{Encode(r.Name)}</a>"
@@ -445,8 +466,10 @@ tr:hover { background: var(--bg-tertiary); }
             sb.AppendLine($"  <td class=\"numeric {combinedSeverity}\" data-v=\"{r.CombinedCount}\">{r.CombinedCount}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.LongCount}\">{r.LongCount}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.ComplexCount}\">{r.ComplexCount}</td>");
+            sb.AppendLine($"  <td class=\"numeric {nestedSeverity}\" data-v=\"{r.NestedCount}\">{r.NestedCount}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.MaxComplexity}\">{r.MaxComplexity}</td>");
             sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.MaxLines}\">{r.MaxLines}</td>");
+            sb.AppendLine($"  <td class=\"numeric\" data-v=\"{r.MaxNesting}\">{r.MaxNesting}</td>");
             sb.AppendLine("</tr>");
             rank++;
         }
@@ -456,7 +479,7 @@ tr:hover { background: var(--bg-tertiary); }
         sb.AppendLine("</div>");
     }
 
-    private void AppendPerRepoDetails(StringBuilder sb, List<RepoStatsRow> repoStats, Dictionary<string, RepoInfo> repoLookup, int thresholdLines, int thresholdComplexity)
+    private void AppendPerRepoDetails(StringBuilder sb, List<RepoStatsRow> repoStats, Dictionary<string, RepoInfo> repoLookup, int thresholdLines, int thresholdComplexity, int thresholdNesting)
     {
         sb.AppendLine("<h2>Per-Repository Details</h2>");
 
@@ -481,9 +504,9 @@ tr:hover { background: var(--bg-tertiary); }
             }
 
             sb.AppendLine($"<div class=\"repo-detail-section\" id=\"repo-{Encode(anchor)}\">");
-            sb.AppendLine($"<h3>{repoLabel} <span class=\"count-badge {scoreSeverity}\" title=\"Weighted sum: 10 pts per combined-risk function, 3 pts per complex-only, 2 pts per long-only, plus bonuses for extreme values.\">score: {repo.ConcernScore}</span></h3>");
+            sb.AppendLine($"<h3>{repoLabel} <span class=\"count-badge {scoreSeverity}\" title=\"Weighted sum: 10 pts per combined-risk function, 3 pts per complex-only, 2 pts per long-only, 3 pts per deeply nested, plus bonuses for extreme values.\">score: {repo.ConcernScore}</span></h3>");
             sb.AppendLine($"<p class=\"subtitle\">{repo.FunctionCount:N0} functions across {repo.FileCount:N0} files &nbsp;|&nbsp; " +
-                          $"Combined: {repo.CombinedCount} &nbsp;|&nbsp; Long: {repo.LongCount} &nbsp;|&nbsp; Complex: {repo.ComplexCount}</p>");
+                          $"Combined: {repo.CombinedCount} &nbsp;|&nbsp; Long: {repo.LongCount} &nbsp;|&nbsp; Complex: {repo.ComplexCount} &nbsp;|&nbsp; Nested: {repo.NestedCount}</p>");
 
             var tablePrefix = $"repo-{anchor}";
 
@@ -502,6 +525,11 @@ tr:hover { background: var(--bg-tertiary); }
             if (repo.Complex.Count > 0)
             {
                 AppendRepoFunctionTable(sb, $"High Complexity (CC >= {thresholdComplexity})", repo.Complex, repo, $"{tablePrefix}-complex");
+            }
+
+            if (repo.Nested.Count > 0)
+            {
+                AppendRepoFunctionTable(sb, $"Deeply Nested (depth >= {thresholdNesting})", repo.Nested, repo, $"{tablePrefix}-nested");
             }
 
             sb.AppendLine("</div>");
