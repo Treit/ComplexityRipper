@@ -1,5 +1,7 @@
 # ComplexityRipper
 
+![alt text](media/ComplexityRipper.png)
+
 [![CI](https://github.com/Treit/ComplexityRipper/actions/workflows/ci.yml/badge.svg)](https://github.com/Treit/ComplexityRipper/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/ComplexityRipper.svg)](https://www.nuget.org/packages/ComplexityRipper/)
 
