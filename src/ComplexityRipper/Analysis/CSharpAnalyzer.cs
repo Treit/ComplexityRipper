@@ -18,19 +18,21 @@ public sealed class CSharpAnalyzer
     /// </summary>
     public AnalysisResult AnalyzeRepos(string rootPath, Action<string>? onProgress = null, Regex? includeFilter = null, Regex? excludeFilter = null, bool includeTestCode = false)
     {
+        var absoluteRoot = Path.GetFullPath(rootPath);
+
         var result = new AnalysisResult
         {
-            Metadata = { RootPath = rootPath, GeneratedAt = DateTimeOffset.UtcNow }
+            Metadata = { RootPath = absoluteRoot, GeneratedAt = DateTimeOffset.UtcNow }
         };
 
-        var repoDirs = ResolveRepoDirs(rootPath);
+        var repoDirs = ResolveRepoDirs(absoluteRoot);
 
         var allFunctions = new System.Collections.Concurrent.ConcurrentBag<FunctionMetrics>();
         var repoInfos = new System.Collections.Concurrent.ConcurrentBag<RepoInfo>();
 
         Parallel.ForEach(repoDirs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, repoDir =>
         {
-            var repoName = Path.GetRelativePath(rootPath, repoDir)
+            var repoName = Path.GetRelativePath(absoluteRoot, repoDir)
                 .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 .Replace(Path.DirectorySeparatorChar, '/');
 

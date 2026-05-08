@@ -1,0 +1,20 @@
+﻿{
+  "profiles": {
+    "analyze": {
+      "commandName": "Project",
+      "commandLineArgs": "analyze --root [PROJECT_PATH] --output stats.json"
+    },
+    "report": {
+      "commandName": "Project",
+      "commandLineArgs": "report --input stats.json --output report.html --theme dark"
+    },
+    "run": {
+      "commandName": "Project",
+      "commandLineArgs": "run --root [PROJECT_PATH] --output report.html --theme dark"
+    },
+    "run-strict": {
+      "commandName": "Project",
+      "commandLineArgs": "run --root [PROJECT_PATH] --output report-strict.html --theme dark --threshold-lines 50 --threshold-complexity 10 --threshold-nesting 2"
+    }
+  }
+}
